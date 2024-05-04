@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"git.cs.nctu.edu.tw/calee/sctp"
+	"github.com/free5gc/sctp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/free5gc/tngf/internal/logger"

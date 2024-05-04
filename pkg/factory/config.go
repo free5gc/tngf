@@ -6,21 +6,24 @@ package factory
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/asaskevich/govalidator"
 
+	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/pkg/context"
-	logger_util "github.com/free5gc/util/logger"
 )
 
 const (
 	TngfExpectedConfigVersion = "1.0.3"
+	TngfDefaultConfigPath     = "./config/tngfcfg.yaml"
 )
 
 type Config struct {
-	Info          *Info               `yaml:"info" valid:"required"`
-	Configuration *Configuration      `yaml:"configuration" valid:"required"`
-	Logger        *logger_util.Logger `yaml:"logger" valid:"optional"`
+	Info          *Info          `yaml:"info" valid:"required"`
+	Configuration *Configuration `yaml:"configuration" valid:"required"`
+	Logger        *Logger        `yaml:"logger" valid:"optional"`
+	sync.RWMutex
 }
 
 func (c *Config) Validate() (bool, error) {
@@ -32,12 +35,6 @@ func (c *Config) Validate() (bool, error) {
 
 	if configuration := c.Configuration; configuration != nil {
 		if result, err := configuration.validate(); err != nil {
-			return result, err
-		}
-	}
-
-	if logger := c.Logger; logger != nil {
-		if result, err := logger.Validate(); err != nil {
 			return result, err
 		}
 	}
@@ -57,7 +54,7 @@ func (i *Info) validate() (bool, error) {
 }
 
 type Configuration struct {
-	TNGFInfo        context.TNGFNFInfo        `yaml:"TNGFInformation" valid:"required"`
+	TNGFInfo         context.TNGFNFInfo         `yaml:"TNGFInformation" valid:"required"`
 	AMFSCTPAddresses []context.AMFSCTPAddresses `yaml:"AMFSCTPAddresses" valid:"required"`
 
 	TCPPort              uint16 `yaml:"NASTCPPort" valid:"port,required"`
@@ -73,6 +70,12 @@ type Configuration struct {
 	CertificateAuthority string `yaml:"CertificateAuthority" valid:"type(string),minstringlength(1),optional"`
 	Certificate          string `yaml:"Certificate" valid:"type(string),minstringlength(1),optional"`
 	RadiusSecret         string `yaml:"RadiusSecret" valid:"type(string),minstringlength(1),optional"`
+}
+
+type Logger struct {
+	Enable       bool   `yaml:"enable" valid:"type(bool)"`
+	Level        string `yaml:"level" valid:"required,in(trace|debug|info|warn|error|fatal|panic)"`
+	ReportCaller bool   `yaml:"reportCaller" valid:"type(bool)"`
 }
 
 func (c *Configuration) validate() (bool, error) {
@@ -110,4 +113,79 @@ func (c *Config) GetVersion() string {
 		return c.Info.Version
 	}
 	return ""
+}
+
+func (c *Config) SetLogEnable(enable bool) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		c.Logger = &Logger{
+			Enable: enable,
+			Level:  "info",
+		}
+	} else {
+		c.Logger.Enable = enable
+	}
+}
+
+func (c *Config) SetLogLevel(level string) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		c.Logger = &Logger{
+			Level: level,
+		}
+	} else {
+		c.Logger.Level = level
+	}
+
+}
+
+func (c *Config) SetLogReportCaller(reportCaller bool) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		c.Logger = &Logger{
+			Level:        "info",
+			ReportCaller: reportCaller,
+		}
+	} else {
+		c.Logger.ReportCaller = reportCaller
+	}
+}
+
+func (c *Config) GetLogEnable() bool {
+	c.RLock()
+	defer c.RUnlock()
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		return false
+	}
+	return c.Logger.Enable
+}
+
+func (c *Config) GetLogLevel() string {
+	c.RLock()
+	defer c.RUnlock()
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		return "info"
+	}
+	return c.Logger.Level
+}
+
+func (c *Config) GetLogReportCaller() bool {
+	c.RLock()
+	defer c.RUnlock()
+	if c.Logger == nil {
+		logger.CfgLog.Warnf("Logger should not be nil")
+		return false
+	}
+	return c.Logger.ReportCaller
 }
