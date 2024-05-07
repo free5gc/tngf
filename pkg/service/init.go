@@ -61,17 +61,7 @@ func NewApp(cfg *factory.Config) (*TngfApp, error) {
 	tngf.SetLogEnable(cfg.GetLogEnable())
 	tngf.SetLogLevel(cfg.GetLogLevel())
 	tngf.SetReportCaller(cfg.GetLogReportCaller())
-	// move from Start(), and return nil error message temporarily
-	if !util.InitTNGFContext() {
-		logger.InitLog.Error("Initicating context failed")
-		return tngf, nil
-	}
-	/*err := tngf_context.InitTngfContext()
-	if err != nil {
-		logger.InitLog.Errorln(err)
-		return tngf, err
-	}
-	tngf.tngfCtx = tngf_context.GetSelf()*/
+
 	return tngf, nil
 }
 
