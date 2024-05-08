@@ -2,24 +2,22 @@ package handler
 
 import (
 	"encoding/binary"
-	// "math/rand"
 	"net"
-	// "time"
 
 	"github.com/free5gc/sctp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/free5gc/aper"
+	"github.com/free5gc/ngap/ngapConvert"
+	"github.com/free5gc/ngap/ngapType"
 	gtp_service "github.com/free5gc/tngf/internal/gtp/service"
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
-	"github.com/free5gc/tngf/pkg/radius/handler"
 	ike_handler "github.com/free5gc/tngf/pkg/ike/handler"
-	radius_message "github.com/free5gc/tngf/pkg/radius/message"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
-	"github.com/free5gc/ngap/ngapConvert"
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/tngf/pkg/radius/handler"
+	radius_message "github.com/free5gc/tngf/pkg/radius/message"
 )
 
 var ngapLog *logrus.Entry

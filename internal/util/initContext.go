@@ -6,8 +6,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/free5gc/sctp"
@@ -125,7 +125,7 @@ func InitTNGFContext() bool {
 			keyPath = factory.TngfConfig.Configuration.PrivateKey
 		}
 
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read private key data from file: %+v", err)
 			return false
@@ -167,7 +167,7 @@ func InitTNGFContext() bool {
 		}
 
 		// Read .pem
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read certificate authority data from file: %+v", err)
 			return false
@@ -206,7 +206,7 @@ func InitTNGFContext() bool {
 		}
 
 		// Read .pem
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read certificate data from file: %+v", err)
 			return false

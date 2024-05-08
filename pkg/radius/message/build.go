@@ -2,9 +2,6 @@ package message
 
 import (
 	"encoding/binary"
-	// "net"
-	// "fmt"
-	// "encoding/hex"
 	"math/big"
 	"net"
 )
@@ -109,7 +106,7 @@ func (container *RadiusPayloadContainer) BuildEAP5GNAS(identifier uint8, nasPDU 
 	*container = append(*container, *payload)
 }
 
-func (container *RadiusPayloadContainer) BuildEAP5GNotification (identifier uint8, ip string) {
+func (container *RadiusPayloadContainer) BuildEAP5GNotification(identifier uint8, ip string) {
 	ipInt := big.NewInt(0)
 	ipv4ContactInfo := ipInt.SetBytes(net.ParseIP(ip).To4()).Uint64()
 	anParameters := make([]byte, 6)
@@ -139,7 +136,7 @@ func (container *RadiusPayloadContainer) BuildEAP5GNotification (identifier uint
 	*container = append(*container, *payload)
 }
 
-func (container *RadiusPayloadContainer) BuildMicrosoftVendorSpecific (vendorType uint8, data []byte) {
+func (container *RadiusPayloadContainer) BuildMicrosoftVendorSpecific(vendorType uint8, data []byte) {
 	vendorSpecific := new(RadiusMicrosoftVendorSpecific)
 	vendorSpecific.Type = vendorType
 	vendorSpecific.String = append(vendorSpecific.String, data...)

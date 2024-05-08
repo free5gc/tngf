@@ -2,9 +2,6 @@ package handler
 
 import (
 	"bytes"
-	// "crypto"
-	// "crypto/rand"
-	// "crypto/rsa"
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
@@ -16,12 +13,12 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
+	"github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 	"github.com/free5gc/tngf/pkg/ike/xfrm"
-	"github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/util/ueauth"
 )
 
@@ -889,10 +886,10 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 	thisUE.TNGFIKESecurityAssociation = ikeSecurityAssociation
 
 	// Store IKE Connection
-	UDPSocket := context.UDPSocketInfo {
-		Conn: udpConn,
+	UDPSocket := context.UDPSocketInfo{
+		Conn:     udpConn,
 		TNGFAddr: tngfAddr,
-		UEAddr: ueAddr,
+		UEAddr:   ueAddr,
 	}
 
 	thisUE.IKEConnection = &UDPSocket

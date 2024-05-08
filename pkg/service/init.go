@@ -2,7 +2,7 @@ package service
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -23,37 +23,12 @@ import (
 	"github.com/free5gc/tngf/pkg/ike/xfrm"
 	radius_service "github.com/free5gc/tngf/pkg/radius/service"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"github.com/vishvananda/netlink"
 )
 
 type TngfApp struct {
 	cfg     *factory.Config
 	tngfCtx *tngf_context.TNGFContext
-}
-
-type (
-	// Commands information.
-	Commands struct {
-		config string
-	}
-)
-
-var commands Commands
-
-var cliCmd = []cli.Flag{
-	cli.StringFlag{
-		Name:  "config, c",
-		Usage: "Load configuration from `FILE`",
-	},
-	cli.StringFlag{
-		Name:  "log, l",
-		Usage: "Output NF log to `FILE`",
-	},
-	cli.StringFlag{
-		Name:  "log5gc, lc",
-		Usage: "Output free5gc log to `FILE`",
-	},
 }
 
 func NewApp(cfg *factory.Config) (*TngfApp, error) {
@@ -69,7 +44,7 @@ func (a *TngfApp) SetLogEnable(enable bool) {
 	logger.MainLog.Infof("Log enable is set to[%v]", enable)
 	if enable && logger.Log.Out == os.Stderr {
 		return
-	} else if !enable && logger.Log.Out == ioutil.Discard {
+	} else if !enable && logger.Log.Out == io.Discard {
 		return
 	}
 
@@ -77,7 +52,7 @@ func (a *TngfApp) SetLogEnable(enable bool) {
 	if enable {
 		logger.Log.SetOutput(os.Stderr)
 	} else {
-		logger.Log.SetOutput(ioutil.Discard)
+		logger.Log.SetOutput(io.Discard)
 	}
 }
 

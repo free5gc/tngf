@@ -2,25 +2,18 @@ package handler
 
 import (
 	"bytes"
-	// "crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
-	// "errors"
-	// "fmt"
 	"net"
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	// "github.com/vishvananda/netlink"
-	// "golang.org/x/sys/unix"
-
 	"github.com/free5gc/tngf/internal/logger"
-	"github.com/free5gc/tngf/pkg/context"
 	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
+	"github.com/free5gc/tngf/pkg/context"
 	radius_message "github.com/free5gc/tngf/pkg/radius/message"
-	// "github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/util/ueauth"
+	"github.com/sirupsen/logrus"
 )
 
 // Log
@@ -38,7 +31,7 @@ const (
 )
 
 func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr,
-		message *radius_message.RadiusMessage) {
+	message *radius_message.RadiusMessage) {
 	radiusLog.Infoln("Handle Radius Access Request")
 	responseRadiusMessage := new(radius_message.RadiusMessage)
 	var responseRadiusPayload radius_message.RadiusPayloadContainer
@@ -76,7 +69,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			message.Payloads[i].Val = make([]byte, 16)
 			exRequestMessageAuthenticator := GetMessageAuthenticator(message)
 			radiusLog.Debugln("expected authenticator:\n", hex.Dump(exRequestMessageAuthenticator))
-			if ! bytes.Equal(requestMessageAuthenticator, exRequestMessageAuthenticator) {
+			if !bytes.Equal(requestMessageAuthenticator, exRequestMessageAuthenticator) {
 				radiusLog.Errorln("Request Message Authenticator error")
 				return
 			}
@@ -85,7 +78,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	var session *context.RadiusSession
 	session, ok := tngfSelf.RadiusSessionPoolLoad(callingStationId)
-	if ! ok {
+	if !ok {
 		session = tngfSelf.NewRadiusSession(callingStationId)
 	}
 
@@ -282,7 +275,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 				ue.AMF = selectedAMF
 				ue.UEIdentity = anParameters.UEIdentity
 
-				ue.RadiusConnection = &context.UDPSocketInfo {
+				ue.RadiusConnection = &context.UDPSocketInfo{
 					Conn:     udpConn,
 					TNGFAddr: tngfAddr,
 					UEAddr:   ueAddr,
@@ -305,7 +298,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 				ue := session.ThisUE
 				amf := ue.AMF
 
-				ue.RadiusConnection = &context.UDPSocketInfo {
+				ue.RadiusConnection = &context.UDPSocketInfo{
 					Conn:     udpConn,
 					TNGFAddr: tngfAddr,
 					UEAddr:   ueAddr,
@@ -356,4 +349,3 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
 	}
 }
-

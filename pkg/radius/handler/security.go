@@ -1,53 +1,18 @@
 package handler
 
 import (
-	// "bytes"
-	// "crypto/aes"
-	// "crypto/cipher"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
-	// "crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	// "fmt"
-	// "hash"
 	"io"
 	"math/big"
-	// "strings"
 
 	"github.com/free5gc/tngf/pkg/context"
 	"github.com/free5gc/tngf/pkg/radius/message"
 )
-
-// General data
-// var (
-// 	randomNumberMaximum big.Int
-// 	randomNumberMinimum big.Int
-// )
-//
-// func init() {
-// 	randomNumberMaximum.SetString(strings.Repeat("F", 512), 16)
-// 	randomNumberMinimum.SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16)
-// }
-//
-// func GenerateRandomNumber() *big.Int {
-// 	var number *big.Int
-// 	var err error
-// 	for {
-// 		number, err = rand.Int(rand.Reader, &randomNumberMaximum)
-// 		if err != nil {
-// 			ikeLog.Errorf("Error occurs when generate random number: %+v", err)
-// 			return nil
-// 		} else {
-// 			if number.Cmp(&randomNumberMinimum) == 1 {
-// 				break
-// 			}
-// 		}
-// 	}
-// 	return number
-// }
 
 func GenerateRandomUint8() (uint8, error) {
 	number := make([]byte, 1)
@@ -92,8 +57,8 @@ func GenerateSalt() (uint16, error) {
 	return uint16(number.Uint64()), nil
 }
 
-func EncryptMppeKey(key, secret, authenticator []byte, saltVal uint16) ([]byte, error){
-	padlen := (md5.Size - (len(key) + 1) % md5.Size) % md5.Size
+func EncryptMppeKey(key, secret, authenticator []byte, saltVal uint16) ([]byte, error) {
+	padlen := (md5.Size - (len(key)+1)%md5.Size) % md5.Size
 	pad := make([]byte, padlen)
 
 	plain := make([]byte, 1)
@@ -113,13 +78,13 @@ func EncryptMppeKey(key, secret, authenticator []byte, saltVal uint16) ([]byte, 
 			block = append(block, salt...)
 			first = false
 		} else {
-			block = append(secret, result[i - md5.Size: i]...)
+			block = append(secret, result[i-md5.Size:i]...)
 		}
 
 		b := md5.Sum(block)
 		result = append(result, b[:]...)
 		for j := 0; j < md5.Size; j++ {
-			result[i + j] = result[i + j] ^ plain[i + j]
+			result[i+j] = result[i+j] ^ plain[i+j]
 		}
 	}
 

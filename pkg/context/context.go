@@ -19,7 +19,6 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/util/idgenerator"
-	// "fmt"
 )
 
 var contextLog *logrus.Entry
