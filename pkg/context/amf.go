@@ -3,11 +3,10 @@ package context
 import (
 	"bytes"
 
-	"github.com/free5gc/sctp"
-
 	"github.com/free5gc/aper"
 	"github.com/free5gc/ngap/ngapConvert"
 	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/sctp"
 )
 
 type TNGFAMF struct {
@@ -84,7 +83,8 @@ func (amf *TNGFAMF) DeleteAMFTNLAssociationItem(info ngapType.CPTransportLayerIn
 
 func (amf *TNGFAMF) StartOverload(
 	resp *ngapType.OverloadResponse, trafloadInd *ngapType.TrafficLoadReductionIndication,
-	nssai *ngapType.OverloadStartNSSAIList) *AMFOverloadContent {
+	nssai *ngapType.OverloadStartNSSAIList,
+) *AMFOverloadContent {
 	if resp == nil && trafloadInd == nil && nssai == nil {
 		return nil
 	}

@@ -8,12 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
 	radius_message "github.com/free5gc/tngf/pkg/radius/message"
 	"github.com/free5gc/util/ueauth"
-	"github.com/sirupsen/logrus"
 )
 
 // Log
@@ -31,7 +32,8 @@ const (
 )
 
 func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr,
-	message *radius_message.RadiusMessage) {
+	message *radius_message.RadiusMessage,
+) {
 	radiusLog.Infoln("Handle Radius Access Request")
 	responseRadiusMessage := new(radius_message.RadiusMessage)
 	var responseRadiusPayload radius_message.RadiusPayloadContainer
@@ -87,7 +89,6 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		// EAP expanded 5G-Start
 		radiusLog.Infoln("Handle EAP-Res/Identity")
 		var identifier uint8
-		var err error
 
 		identifier, err = GenerateRandomUint8()
 		if err != nil {
@@ -106,7 +107,9 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			payload.Length = uint8(18)
 			payload.Val = make([]byte, 16)
 
-			tmpResponseRadiusPayload := append(responseRadiusPayload, *payload)
+			tmpResponseRadiusPayload := responseRadiusPayload
+			tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+
 			tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
 
 			payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
@@ -118,8 +121,11 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	case EAP5GNAS:
 		radiusLog.Infoln("Handle EAP-Res/5G-NAS")
-		eap := new(radius_message.EAP)
-		eap.Unmarshal(eapMessage)
+		var eap *radius_message.EAP
+		err = eap.Unmarshal(eapMessage)
+		if err != nil {
+			radiusLog.Errorf("[EAP] EAP5GNAS unmarshal error: %+v", err)
+		}
 		if eap != nil {
 			if eap.Code != radius_message.EAPCodeResponse {
 				radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
@@ -146,9 +152,9 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 				return
 			}
 
-			eap5GMessageID, anParameters, nasPDU, err := UnmarshalEAP5GData(eapExpanded.VendorData)
-			if err != nil {
-				radiusLog.Errorf("Unmarshalling EAP-5G packet failed: %+v", err)
+			eap5GMessageID, anParameters, nasPDU, unmarshal_err := UnmarshalEAP5GData(eapExpanded.VendorData)
+			if unmarshal_err != nil {
+				radiusLog.Errorf("Unmarshalling EAP-5G packet failed: %+v", unmarshal_err)
 				return
 			}
 
@@ -159,9 +165,9 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 				responseRadiusMessage.Payloads.Reset()
 
 				// EAP
-				identifier, err := GenerateRandomUint8()
-				if err != nil {
-					radiusLog.Errorf("Generate random uint8 failed: %+v", err)
+				identifier, random_err := GenerateRandomUint8()
+				if random_err != nil {
+					radiusLog.Errorf("Generate random uint8 failed: %+v", random_err)
 					return
 				}
 				responseRadiusPayload.BuildEAPfailure(identifier)
@@ -173,7 +179,9 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 					payload.Length = uint8(18)
 					payload.Val = make([]byte, 16)
 
-					tmpResponseRadiusPayload := append(responseRadiusPayload, *payload)
+					tmpResponseRadiusPayload := responseRadiusPayload
+					tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+
 					tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
 
 					payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
@@ -236,9 +244,9 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 					responseRadiusMessage.Payloads.Reset()
 
 					// EAP
-					identifier, err := GenerateRandomUint8()
-					if err != nil {
-						radiusLog.Errorf("Generate random uint8 failed: %+v", err)
+					identifier, random_err := GenerateRandomUint8()
+					if random_err != nil {
+						radiusLog.Errorf("Generate random uint8 failed: %+v", random_err)
 						return
 					}
 					responseRadiusPayload.BuildEAPfailure(identifier)
@@ -250,7 +258,8 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 						payload.Length = uint8(18)
 						payload.Val = make([]byte, 16)
 
-						tmpResponseRadiusPayload := append(responseRadiusPayload, *payload)
+						tmpResponseRadiusPayload := responseRadiusPayload
+						tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
 						tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
 
 						payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
@@ -317,13 +326,22 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		responseRadiusMessage.BuildRadiusHeader(radius_message.AccessAccept, message.PktID, message.Auth)
 		responseRadiusPayload.BuildEAPSuccess(identifier)
 
-		// Derivate Ktnap
+		// Derivative Ktnap
 		thisUE := session.ThisUE
 		p0 := []byte{0x2}
-		thisUE.Ktnap, _ = ueauth.GetKDFValue(thisUE.Ktngf, ueauth.FC_FOR_KTIPSEC_KTNAP_DERIVATION, p0, ueauth.KDFLen(p0))
-		salt, _ := GenerateSalt()
+		thisUE.Ktnap, err = ueauth.GetKDFValue(thisUE.Ktngf, ueauth.FC_FOR_KTIPSEC_KTNAP_DERIVATION, p0, ueauth.KDFLen(p0))
+		if err != nil {
+			radiusLog.Errorf("Initial Context Setup GetKDFValue(): %+v", err)
+		}
+		salt, salt_err := GenerateSalt()
+		if salt_err != nil {
+			radiusLog.Errorf("Initial Context Setup GenerateSalt(): %+v", salt_err)
+		}
 
-		mppeRecvKey, _ := EncryptMppeKey(thisUE.Ktnap, []byte(tngfSelf.RadiusSecret), message.Auth, salt)
+		mppeRecvKey, encrypt_err := EncryptMppeKey(thisUE.Ktnap, []byte(tngfSelf.RadiusSecret), message.Auth, salt)
+		if encrypt_err != nil {
+			radiusLog.Errorf("Initial Context Setup EncryptMppeKey(): %+v", err)
+		}
 		vendorSpecificData := make([]byte, 2)
 		binary.BigEndian.PutUint16(vendorSpecificData, salt)
 		vendorSpecificData = append(vendorSpecificData, mppeRecvKey...)
@@ -339,7 +357,8 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			payload.Length = uint8(18)
 			payload.Val = make([]byte, 16)
 
-			tmpResponseRadiusPayload := append(responseRadiusPayload, *payload)
+			tmpResponseRadiusPayload := responseRadiusPayload
+			tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
 			tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
 
 			payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)

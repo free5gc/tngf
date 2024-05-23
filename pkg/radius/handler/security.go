@@ -72,19 +72,21 @@ func EncryptMppeKey(key, secret, authenticator []byte, saltVal uint16) ([]byte, 
 	binary.BigEndian.PutUint16(salt, saltVal)
 
 	for i := 0; i < len(plain); i += md5.Size {
-		block := make([]byte, 0)
+		var block []byte
 		if first {
-			block = append(secret, authenticator...)
+			block = secret
+			block = append(block, authenticator...)
 			block = append(block, salt...)
 			first = false
 		} else {
-			block = append(secret, result[i-md5.Size:i]...)
+			block = secret
+			block = append(block, result[i-md5.Size:i]...)
 		}
 
 		b := md5.Sum(block)
 		result = append(result, b[:]...)
 		for j := 0; j < md5.Size; j++ {
-			result[i+j] = result[i+j] ^ plain[i+j]
+			result[i+j] ^= plain[i+j]
 		}
 	}
 

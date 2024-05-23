@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/free5gc/aper"
-	"github.com/free5gc/tngf/pkg/radius/message"
 	"github.com/free5gc/nas/nasType"
 	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/tngf/pkg/radius/message"
 )
 
 // 3GPP specified EAP-5G
@@ -21,14 +21,19 @@ type ANParameters struct {
 	UEIdentity         *nasType.MobileIdentity5GS
 }
 
-func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *ANParameters, nasPDU []byte, err error) {
+func UnmarshalEAP5GData(codedData []byte) (
+	eap5GMessageID uint8,
+	anParameters *ANParameters,
+	nasPDU []byte,
+	err error,
+) {
 	if len(codedData) >= 2 {
 		radiusLog.Debug("===== Unmarshal EAP5G Data (Ref: TS24.502 Fig. 9.3.2.2.2-1) =====")
 
 		eap5GMessageID = codedData[0]
 		radiusLog.Debugf("Message-Id: %d", eap5GMessageID)
 		if eap5GMessageID == message.EAP5GType5GStop {
-			return
+			return 0, nil, nil, errors.New("eap5GType5GStop")
 		}
 
 		codedData = codedData[2:]
@@ -85,9 +90,9 @@ func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *A
 							guamiField = append(guamiField, parameterValue...)
 							// Decode GUAMI using aper
 							ngapGUAMI := new(ngapType.GUAMI)
-							err := aper.UnmarshalWithParams(guamiField, ngapGUAMI, "valueExt")
-							if err != nil {
-								radiusLog.Errorf("APER unmarshal with parameter failed: %+v", err)
+							unmarshal_err := aper.UnmarshalWithParams(guamiField, ngapGUAMI, "valueExt")
+							if unmarshal_err != nil {
+								radiusLog.Errorf("APER unmarshal with parameter failed: %+v", unmarshal_err)
 								return 0, nil, nil, errors.New("Unmarshal failed when decoding GUAMI")
 							}
 							anParameters.GUAMI = ngapGUAMI
@@ -119,9 +124,9 @@ func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *A
 							plmnField = append(plmnField, parameterValue...)
 							// Decode PLMN using aper
 							ngapPLMN := new(ngapType.PLMNIdentity)
-							err := aper.UnmarshalWithParams(plmnField, ngapPLMN, "valueExt")
-							if err != nil {
-								radiusLog.Errorf("APER unmarshal with parameter failed: %v", err)
+							unmarshal_err := aper.UnmarshalWithParams(plmnField, ngapPLMN, "valueExt")
+							if unmarshal_err != nil {
+								radiusLog.Errorf("APER unmarshal with parameter failed: %v", unmarshal_err)
 								return 0, nil, nil, errors.New("Unmarshal failed when decoding PLMN")
 							}
 							anParameters.SelectedPLMNID = ngapPLMN
@@ -224,8 +229,8 @@ func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *A
 								radiusLog.Trace("AN-Parameter establishment cause: Emergency")
 							case message.EstablishmentCauseHighPriorityAccess:
 								radiusLog.Trace("AN-Parameter establishment cause: High Priority Access")
-							case message.EstablishmentCauseMO_Signalling:
-								radiusLog.Trace("AN-Parameter establishment cause: MO Signalling")
+							case message.EstablishmentCauseMO_Signaling:
+								radiusLog.Trace("AN-Parameter establishment cause: MO Signaling")
 							case message.EstablishmentCauseMO_Data:
 								radiusLog.Trace("AN-Parameter establishment cause: MO Data")
 							case message.EstablishmentCauseMPS_PriorityAccess:
@@ -252,10 +257,10 @@ func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *A
 
 							if len(parameterValue) < int(parameterLength) {
 								return 0, nil, nil, errors.New("Error formatting")
-							} else {
-								parameterValue = parameterValue[:parameterLength]
 							}
-
+							// else {
+							// 	parameterValue = parameterValue[:parameterLength]
+							// }
 						} else {
 							radiusLog.Warn("AN-Parameter selected NID field empty")
 						}
@@ -327,7 +332,7 @@ func UnmarshalEAP5GData(codedData []byte) (eap5GMessageID uint8, anParameters *A
 			return 0, nil, nil, errors.New("Error formatting")
 		}
 
-		return
+		return eap5GMessageID, anParameters, nasPDU, nil
 	} else {
 		return 0, nil, nil, errors.New("No data to decode")
 	}

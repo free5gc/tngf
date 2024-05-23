@@ -3,14 +3,14 @@ package ngap
 import (
 	"runtime/debug"
 
-	"github.com/free5gc/sctp"
 	"github.com/sirupsen/logrus"
 
+	"github.com/free5gc/ngap"
+	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/internal/ngap/handler"
 	"github.com/free5gc/tngf/pkg/context"
-	"github.com/free5gc/ngap"
-	"github.com/free5gc/ngap/ngapType"
 )
 
 var Ngaplog *logrus.Entry

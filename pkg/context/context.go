@@ -11,12 +11,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/free5gc/sctp"
 	"github.com/sirupsen/logrus"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
 	"golang.org/x/net/ipv4"
 
 	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/util/idgenerator"
 )
@@ -111,6 +111,7 @@ func (context *TNGFContext) RadiusSessionPoolLoad(ranUeNgapId string) (*RadiusSe
 		return nil, ok
 	}
 }
+
 func (context *TNGFContext) NewTngfUe() *TNGFUe {
 	ranUeNgapId, err := context.RANUENGAPIDGenerator.Allocate()
 	if err != nil {
@@ -305,7 +306,8 @@ func (context *TNGFContext) AllocatedUETEIDLoad(teid uint32) (*TNGFUe, bool) {
 }
 
 func (context *TNGFContext) AMFSelection(ueSpecifiedGUAMI *ngapType.GUAMI,
-	ueSpecifiedPLMNId *ngapType.PLMNIdentity) *TNGFAMF {
+	ueSpecifiedPLMNId *ngapType.PLMNIdentity,
+) *TNGFAMF {
 	var availableAMF *TNGFAMF
 	context.AMFPool.Range(func(key, value interface{}) bool {
 		amf := value.(*TNGFAMF)
@@ -345,19 +347,19 @@ func generateRandomIPinRange(subnet *net.IPNet) net.IP {
 	return net.IPv4(ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3])
 }
 
-func GetInterfaceName(IPAddress string) (interfaceName string, err error) {
+func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return "nil", err
 	}
 
 	for _, inter := range interfaces {
-		addrs, err := inter.Addrs()
-		if err != nil {
-			return "nil", err
+		addrs, addr_err := inter.Addrs()
+		if addr_err != nil {
+			return "nil", addr_err
 		}
 		for _, addr := range addrs {
-			if IPAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
+			if ipAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
 				return inter.Name, nil
 			}
 		}

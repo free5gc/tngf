@@ -6,14 +6,14 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/free5gc/sctp"
 	"github.com/sirupsen/logrus"
 
+	lib_ngap "github.com/free5gc/ngap"
+	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/internal/ngap"
 	"github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
-	lib_ngap "github.com/free5gc/ngap"
 )
 
 var ngapLog *logrus.Entry
@@ -115,11 +115,11 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 	data := make([]byte, 65535)
 
 	for {
-		n, info, _, err := conn.SCTPRead(data)
+		n, sctp_info, _, sctpread_err := conn.SCTPRead(data)
 
-		if err != nil {
+		if sctpread_err != nil {
 			ngapLog.Debugf("[SCTP] AMF SCTP address: %+v", conn.RemoteAddr().String())
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if sctpread_err == io.EOF || sctpread_err == io.ErrUnexpectedEOF {
 				ngapLog.Warn("[SCTP] Close connection.")
 				errConn := conn.Close()
 				if errConn != nil {
@@ -127,11 +127,11 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 				}
 				return
 			}
-			ngapLog.Errorf("[SCTP] Read from SCTP connection failed: %+v", err)
+			ngapLog.Errorf("[SCTP] Read from SCTP connection failed: %+v", sctpread_err)
 		} else {
 			ngapLog.Tracef("[SCTP] Successfully read %d bytes.", n)
 
-			if info == nil || info.PPID != lib_ngap.PPID {
+			if sctp_info == nil || sctp_info.PPID != lib_ngap.PPID {
 				ngapLog.Warn("Received SCTP PPID != 60")
 				continue
 			}

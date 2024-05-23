@@ -85,9 +85,7 @@ func (c *Configuration) validate() (bool, error) {
 		}
 	}
 
-	govalidator.TagMap["cidr"] = govalidator.Validator(func(str string) bool {
-		return govalidator.IsCIDR(str)
-	})
+	govalidator.TagMap["cidr"] = govalidator.Validator(govalidator.IsCIDR)
 
 	result, err := govalidator.ValidateStruct(c)
 	return result, appendInvalid(err)
@@ -142,7 +140,6 @@ func (c *Config) SetLogLevel(level string) {
 	} else {
 		c.Logger.Level = level
 	}
-
 }
 
 func (c *Config) SetLogReportCaller(reportCaller bool) {

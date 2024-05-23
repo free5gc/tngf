@@ -9,7 +9,8 @@ import (
 func (radiusMessage *RadiusMessage) BuildRadiusHeader(
 	code uint8,
 	pktID uint8,
-	auth []byte) {
+	auth []byte,
+) {
 	radiusMessage.Code = code
 	radiusMessage.PktID = pktID
 	radiusMessage.Auth = auth
@@ -23,7 +24,11 @@ func (container *RadiusPayloadContainer) BuildEAP(code uint8, identifier uint8) 
 	eap := new(EAP)
 	eap.Code = code
 	eap.Identifier = identifier
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAP(): marshal error: %+v", err)
+		return nil
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -36,7 +41,11 @@ func (container *RadiusPayloadContainer) BuildEAPSuccess(identifier uint8) {
 	eap := new(EAP)
 	eap.Code = EAPCodeSuccess
 	eap.Identifier = identifier
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAPSuccess(): marshal error: %+v", err)
+		return
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -49,7 +58,11 @@ func (container *RadiusPayloadContainer) BuildEAPfailure(identifier uint8) {
 	eap := new(EAP)
 	eap.Code = EAPCodeFailure
 	eap.Identifier = identifier
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAPfailure(): marshal error: %+v", err)
+		return
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -70,7 +83,11 @@ func (container *RadiusPayloadContainer) BuildEAP5GStart(identifier uint8) {
 	eap.Code = EAPCodeRequest
 	eap.Identifier = identifier
 	eap.EAPTypeData.BuildEAPExpanded(VendorID3GPP, VendorTypeEAP5G, []byte{EAP5GType5GStart, EAP5GSpareValue})
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAP5GStart(): marshal error: %+v", err)
+		return
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -91,13 +108,18 @@ func (container *RadiusPayloadContainer) BuildEAP5GNAS(identifier uint8, nasPDU 
 	header[0] = EAP5GType5GNAS
 	// NASPDU length (2 octets)
 	binary.BigEndian.PutUint16(header[2:4], uint16(len(nasPDU)))
-	vendorData := append(header, nasPDU...)
+	vendorData := header
+	vendorData = append(vendorData, nasPDU...)
 
 	eap := new(EAP)
 	eap.Code = EAPCodeRequest
 	eap.Identifier = identifier
 	eap.EAPTypeData.BuildEAPExpanded(VendorID3GPP, VendorTypeEAP5G, vendorData)
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAP5GNAS(): marshal error: %+v", err)
+		return
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -121,13 +143,18 @@ func (container *RadiusPayloadContainer) BuildEAP5GNotification(identifier uint8
 	header[0] = EAP5GType5GNotification
 	// AN-Parameter length (2 octets)
 	binary.BigEndian.PutUint16(header[2:4], uint16(len(anParameters)))
-	vendorData := append(header, anParameters...)
+	vendorData := header
+	vendorData = append(vendorData, anParameters...)
 
 	eap := new(EAP)
 	eap.Code = EAPCodeRequest
 	eap.Identifier = identifier
 	eap.EAPTypeData.BuildEAPExpanded(VendorID3GPP, VendorTypeEAP5G, vendorData)
-	eapPayload, _ := eap.Marshal()
+	eapPayload, err := eap.Marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildEAP5GNotification(): marshal error: %+v", err)
+		return
+	}
 
 	payload := new(RadiusPayload)
 	payload.Type = TypeEAPMessage
@@ -140,7 +167,11 @@ func (container *RadiusPayloadContainer) BuildMicrosoftVendorSpecific(vendorType
 	vendorSpecific := new(RadiusMicrosoftVendorSpecific)
 	vendorSpecific.Type = vendorType
 	vendorSpecific.String = append(vendorSpecific.String, data...)
-	vendorSpecificPayload, _ := vendorSpecific.marshal()
+	vendorSpecificPayload, err := vendorSpecific.marshal()
+	if err != nil {
+		radiusLog.Errorf("BuildMicrosoftVendorSpecific(): marshal error: %+v", err)
+		return
+	}
 
 	vendorID := make([]byte, 4)
 	binary.BigEndian.PutUint32(vendorID, uint32(311))

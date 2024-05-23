@@ -257,7 +257,7 @@ type Transform struct {
 func (securityAssociation *SecurityAssociation) Type() IKEPayloadType { return TypeSA }
 
 func (securityAssociation *SecurityAssociation) marshal() ([]byte, error) {
-	ikeLog.Info("[SecurityAssociation] marshal(): Start marshalling")
+	ikeLog.Info("[SecurityAssociation] marshal(): Start marshaling")
 
 	securityAssociationData := make([]byte, 0)
 
@@ -460,7 +460,7 @@ type KeyExchange struct {
 func (keyExchange *KeyExchange) Type() IKEPayloadType { return TypeKE }
 
 func (keyExchange *KeyExchange) marshal() ([]byte, error) {
-	ikeLog.Info("[KeyExchange] marshal(): Start marshalling")
+	ikeLog.Info("[KeyExchange] marshal(): Start marshaling")
 
 	keyExchangeData := make([]byte, 4)
 
@@ -500,7 +500,7 @@ type IdentificationInitiator struct {
 func (identification *IdentificationInitiator) Type() IKEPayloadType { return TypeIDi }
 
 func (identification *IdentificationInitiator) marshal() ([]byte, error) {
-	ikeLog.Info("[Identification] marshal(): Start marshalling")
+	ikeLog.Info("[Identification] marshal(): Start marshaling")
 
 	identificationData := make([]byte, 4)
 
@@ -540,7 +540,7 @@ type IdentificationResponder struct {
 func (identification *IdentificationResponder) Type() IKEPayloadType { return TypeIDr }
 
 func (identification *IdentificationResponder) marshal() ([]byte, error) {
-	ikeLog.Info("[Identification] marshal(): Start marshalling")
+	ikeLog.Info("[Identification] marshal(): Start marshaling")
 
 	identificationData := make([]byte, 4)
 
@@ -580,7 +580,7 @@ type Certificate struct {
 func (certificate *Certificate) Type() IKEPayloadType { return TypeCERT }
 
 func (certificate *Certificate) marshal() ([]byte, error) {
-	ikeLog.Info("[Certificate] marshal(): Start marshalling")
+	ikeLog.Info("[Certificate] marshal(): Start marshaling")
 
 	certificateData := make([]byte, 1)
 
@@ -620,7 +620,7 @@ type CertificateRequest struct {
 func (certificateRequest *CertificateRequest) Type() IKEPayloadType { return TypeCERTreq }
 
 func (certificateRequest *CertificateRequest) marshal() ([]byte, error) {
-	ikeLog.Info("[CertificateRequest] marshal(): Start marshalling")
+	ikeLog.Info("[CertificateRequest] marshal(): Start marshaling")
 
 	certificateRequestData := make([]byte, 1)
 
@@ -660,7 +660,7 @@ type Authentication struct {
 func (authentication *Authentication) Type() IKEPayloadType { return TypeAUTH }
 
 func (authentication *Authentication) marshal() ([]byte, error) {
-	ikeLog.Info("[Authentication] marshal(): Start marshalling")
+	ikeLog.Info("[Authentication] marshal(): Start marshaling")
 
 	authenticationData := make([]byte, 4)
 
@@ -699,7 +699,7 @@ type Nonce struct {
 func (nonce *Nonce) Type() IKEPayloadType { return TypeNiNr }
 
 func (nonce *Nonce) marshal() ([]byte, error) {
-	ikeLog.Info("[Nonce] marshal(): Start marshalling")
+	ikeLog.Info("[Nonce] marshal(): Start marshaling")
 
 	nonceData := make([]byte, 0)
 	nonceData = append(nonceData, nonce.NonceData...)
@@ -733,7 +733,7 @@ type Notification struct {
 func (notification *Notification) Type() IKEPayloadType { return TypeN }
 
 func (notification *Notification) marshal() ([]byte, error) {
-	ikeLog.Info("[Notification] marshal(): Start marshalling")
+	ikeLog.Info("[Notification] marshal(): Start marshaling")
 
 	notificationData := make([]byte, 4)
 
@@ -786,7 +786,7 @@ type Delete struct {
 func (del *Delete) Type() IKEPayloadType { return TypeD }
 
 func (del *Delete) marshal() ([]byte, error) {
-	ikeLog.Info("[Delete] marshal(): Start marshalling")
+	ikeLog.Info("[Delete] marshal(): Start marshaling")
 
 	if len(del.SPIs) != (int(del.SPISize) * int(del.NumberOfSPI)) {
 		return nil, fmt.Errorf("Total bytes of all SPIs not correct")
@@ -840,7 +840,7 @@ type VendorID struct {
 func (vendorID *VendorID) Type() IKEPayloadType { return TypeV }
 
 func (vendorID *VendorID) marshal() ([]byte, error) {
-	ikeLog.Info("[VendorID] marshal(): Start marshalling")
+	ikeLog.Info("[VendorID] marshal(): Start marshaling")
 	return vendorID.VendorIDData, nil
 }
 
@@ -878,7 +878,7 @@ type IndividualTrafficSelector struct {
 func (trafficSelector *TrafficSelectorInitiator) Type() IKEPayloadType { return TypeTSi }
 
 func (trafficSelector *TrafficSelectorInitiator) marshal() ([]byte, error) {
-	ikeLog.Info("[TrafficSelector] marshal(): Start marshalling")
+	ikeLog.Info("[TrafficSelector] marshal(): Start marshaling")
 
 	if len(trafficSelector.TrafficSelectors) > 0 {
 		trafficSelectorData := make([]byte, 4)
@@ -937,7 +937,7 @@ func (trafficSelector *TrafficSelectorInitiator) marshal() ([]byte, error) {
 
 		return trafficSelectorData, nil
 	} else {
-		return nil, errors.New("TrafficSelector: Contains no traffic selector for marshalling message")
+		return nil, errors.New("TrafficSelector: Contains no traffic selector for marshaling message")
 	}
 }
 
@@ -1027,7 +1027,7 @@ type TrafficSelectorResponder struct {
 func (trafficSelector *TrafficSelectorResponder) Type() IKEPayloadType { return TypeTSr }
 
 func (trafficSelector *TrafficSelectorResponder) marshal() ([]byte, error) {
-	ikeLog.Info("[TrafficSelector] marshal(): Start marshalling")
+	ikeLog.Info("[TrafficSelector] marshal(): Start marshaling")
 
 	if len(trafficSelector.TrafficSelectors) > 0 {
 		trafficSelectorData := make([]byte, 4)
@@ -1085,7 +1085,7 @@ func (trafficSelector *TrafficSelectorResponder) marshal() ([]byte, error) {
 
 		return trafficSelectorData, nil
 	} else {
-		return nil, errors.New("TrafficSelector: Contains no traffic selector for marshalling message")
+		return nil, errors.New("TrafficSelector: Contains no traffic selector for marshaling message")
 	}
 }
 
@@ -1176,7 +1176,7 @@ type Encrypted struct {
 func (encrypted *Encrypted) Type() IKEPayloadType { return TypeSK }
 
 func (encrypted *Encrypted) marshal() ([]byte, error) {
-	ikeLog.Info("[Encrypted] marshal(): Start marshalling")
+	ikeLog.Info("[Encrypted] marshal(): Start marshaling")
 
 	if len(encrypted.EncryptedData) == 0 {
 		ikeLog.Warn("[Encrypted] The encrypted data is empty")
@@ -1211,7 +1211,7 @@ type IndividualConfigurationAttribute struct {
 func (configuration *Configuration) Type() IKEPayloadType { return TypeCP }
 
 func (configuration *Configuration) marshal() ([]byte, error) {
-	ikeLog.Info("[Configuration] marshal(): Start marshalling")
+	ikeLog.Info("[Configuration] marshal(): Start marshaling")
 
 	configurationData := make([]byte, 4)
 
@@ -1284,7 +1284,7 @@ type EAP struct {
 func (eap *EAP) Type() IKEPayloadType { return TypeEAP }
 
 func (eap *EAP) marshal() ([]byte, error) {
-	ikeLog.Info("[EAP] marshal(): Start marshalling")
+	ikeLog.Info("[EAP] marshal(): Start marshaling")
 
 	eapData := make([]byte, 4)
 
@@ -1380,7 +1380,7 @@ type EAPIdentity struct {
 func (eapIdentity *EAPIdentity) Type() EAPType { return EAPTypeIdentity }
 
 func (eapIdentity *EAPIdentity) marshal() ([]byte, error) {
-	ikeLog.Info("[EAP][Identity] marshal(): Start marshalling")
+	ikeLog.Info("[EAP][Identity] marshal(): Start marshaling")
 
 	if len(eapIdentity.IdentityData) == 0 {
 		return nil, errors.New("EAPIdentity: EAP identity is empty")
@@ -1414,7 +1414,7 @@ type EAPNotification struct {
 func (eapNotification *EAPNotification) Type() EAPType { return EAPTypeNotification }
 
 func (eapNotification *EAPNotification) marshal() ([]byte, error) {
-	ikeLog.Info("[EAP][Notification] marshal(): Start marshalling")
+	ikeLog.Info("[EAP][Notification] marshal(): Start marshaling")
 
 	if len(eapNotification.NotificationData) == 0 {
 		return nil, errors.New("EAPNotification: EAP notification is empty")
@@ -1448,7 +1448,7 @@ type EAPNak struct {
 func (eapNak *EAPNak) Type() EAPType { return EAPTypeNak }
 
 func (eapNak *EAPNak) marshal() ([]byte, error) {
-	ikeLog.Info("[EAP][Nak] marshal(): Start marshalling")
+	ikeLog.Info("[EAP][Nak] marshal(): Start marshaling")
 
 	if len(eapNak.NakData) == 0 {
 		return nil, errors.New("EAPNak: EAP nak is empty")
@@ -1484,7 +1484,7 @@ type EAPExpanded struct {
 func (eapExpanded *EAPExpanded) Type() EAPType { return EAPTypeExpanded }
 
 func (eapExpanded *EAPExpanded) marshal() ([]byte, error) {
-	ikeLog.Info("[EAP][Expanded] marshal(): Start marshalling")
+	ikeLog.Info("[EAP][Expanded] marshal(): Start marshaling")
 
 	eapExpandedData := make([]byte, 8)
 

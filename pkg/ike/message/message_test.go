@@ -1,4 +1,4 @@
-package message
+package message_test
 
 import (
 	"bytes"
@@ -11,6 +11,8 @@ import (
 	Mrand "math/rand"
 	"net"
 	"testing"
+
+	"github.com/free5gc/tngf/pkg/ike/message"
 )
 
 var conn net.Conn
@@ -32,7 +34,7 @@ func init() {
 // Third, send the encoded data to the UDP connection for verification with Wireshark.
 // Compare the dataFirstEncode and dataSecondEncode and return the result.
 func TestEncodeDecode(t *testing.T) {
-	testPacket := &IKEMessage{}
+	testPacket := &message.IKEMessage{}
 
 	// random an SPI
 	src := Mrand.NewSource(63579)
@@ -45,13 +47,13 @@ func TestEncodeDecode(t *testing.T) {
 	testPacket.Flags = 16        // flagI is set
 	testPacket.MessageID = 0     // for IKE_SA_INIT
 
-	testSA := &SecurityAssociation{}
+	testSA := &message.SecurityAssociation{}
 
-	testProposal1 := &Proposal{}
+	testProposal1 := &message.Proposal{}
 	testProposal1.ProposalNumber = 1 // first
 	testProposal1.ProtocolID = 1     // IKE
 
-	testtransform1 := &Transform{}
+	testtransform1 := &message.Transform{}
 	testtransform1.TransformType = 1 // ENCR
 	testtransform1.TransformID = 12  // ENCR_AES_CBC
 	testtransform1.AttributePresent = true
@@ -61,7 +63,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testProposal1.EncryptionAlgorithm = append(testProposal1.EncryptionAlgorithm, testtransform1)
 
-	testtransform2 := &Transform{}
+	testtransform2 := &message.Transform{}
 	testtransform2.TransformType = 1 // ENCR
 	testtransform2.TransformID = 12  // ENCR_AES_CBC
 	testtransform2.AttributePresent = true
@@ -71,14 +73,14 @@ func TestEncodeDecode(t *testing.T) {
 
 	testProposal1.EncryptionAlgorithm = append(testProposal1.EncryptionAlgorithm, testtransform2)
 
-	testtransform3 := &Transform{}
+	testtransform3 := &message.Transform{}
 	testtransform3.TransformType = 3 // INTEG
 	testtransform3.TransformID = 5   // AUTH_AES_XCBC_96
 	testtransform3.AttributePresent = false
 
 	testProposal1.IntegrityAlgorithm = append(testProposal1.IntegrityAlgorithm, testtransform3)
 
-	testtransform4 := &Transform{}
+	testtransform4 := &message.Transform{}
 	testtransform4.TransformType = 3 // INTEG
 	testtransform4.TransformID = 2   // AUTH_HMAC_SHA1_96
 	testtransform4.AttributePresent = false
@@ -87,11 +89,11 @@ func TestEncodeDecode(t *testing.T) {
 
 	testSA.Proposals = append(testSA.Proposals, testProposal1)
 
-	testProposal2 := &Proposal{}
+	testProposal2 := &message.Proposal{}
 	testProposal2.ProposalNumber = 2 // second
 	testProposal2.ProtocolID = 1     // IKE
 
-	testtransform1 = &Transform{}
+	testtransform1 = &message.Transform{}
 	testtransform1.TransformType = 1 // ENCR
 	testtransform1.TransformID = 12  // ENCR_AES_CBC
 	testtransform1.AttributePresent = true
@@ -101,7 +103,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testProposal2.EncryptionAlgorithm = append(testProposal2.EncryptionAlgorithm, testtransform1)
 
-	testtransform2 = &Transform{}
+	testtransform2 = &message.Transform{}
 	testtransform2.TransformType = 1 // ENCR
 	testtransform2.TransformID = 12  // ENCR_AES_CBC
 	testtransform2.AttributePresent = true
@@ -111,14 +113,14 @@ func TestEncodeDecode(t *testing.T) {
 
 	testProposal2.EncryptionAlgorithm = append(testProposal2.EncryptionAlgorithm, testtransform2)
 
-	testtransform3 = &Transform{}
+	testtransform3 = &message.Transform{}
 	testtransform3.TransformType = 3 // INTEG
 	testtransform3.TransformID = 1   // AUTH_HMAC_MD5_96
 	testtransform3.AttributePresent = false
 
 	testProposal2.IntegrityAlgorithm = append(testProposal2.IntegrityAlgorithm, testtransform3)
 
-	testtransform4 = &Transform{}
+	testtransform4 = &message.Transform{}
 	testtransform4.TransformType = 3 // INTEG
 	testtransform4.TransformID = 2   // AUTH_HMAC_SHA1_96
 	testtransform4.AttributePresent = false
@@ -129,7 +131,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testSA)
 
-	testKE := &KeyExchange{}
+	testKE := &message.KeyExchange{}
 
 	testKE.DiffieHellmanGroup = 1
 	for i := 0; i < 8; i++ {
@@ -140,7 +142,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testKE)
 
-	testIDr := &IdentificationResponder{}
+	testIDr := &message.IdentificationResponder{}
 
 	testIDr.IDType = 3
 	for i := 0; i < 8; i++ {
@@ -151,7 +153,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testIDr)
 
-	testCert := &Certificate{}
+	testCert := &message.Certificate{}
 
 	testCert.CertificateEncoding = 1
 	for i := 0; i < 8; i++ {
@@ -162,7 +164,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testCert)
 
-	testCertReq := &CertificateRequest{}
+	testCertReq := &message.CertificateRequest{}
 
 	testCertReq.CertificateEncoding = 1
 	for i := 0; i < 8; i++ {
@@ -173,7 +175,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testCertReq)
 
-	testAuth := &Authentication{}
+	testAuth := &message.Authentication{}
 
 	testAuth.AuthenticationMethod = 1
 	for i := 0; i < 8; i++ {
@@ -184,7 +186,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testAuth)
 
-	testNonce := &Nonce{}
+	testNonce := &message.Nonce{}
 
 	for i := 0; i < 8; i++ {
 		partNonce := make([]byte, 8)
@@ -194,7 +196,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testNonce)
 
-	testNotification := &Notification{}
+	testNotification := &message.Notification{}
 
 	testNotification.ProtocolID = 1
 	testNotification.NotifyMessageType = 2
@@ -213,7 +215,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testNotification)
 
-	testDelete := &Delete{}
+	testDelete := &message.Delete{}
 
 	testDelete.ProtocolID = 1
 	testDelete.SPISize = 9
@@ -225,7 +227,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testDelete)
 
-	testVendor := &VendorID{}
+	testVendor := &message.VendorID{}
 
 	for i := 0; i < 5; i++ {
 		partVendorData := make([]byte, 8)
@@ -235,9 +237,9 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testVendor)
 
-	testTSi := &TrafficSelectorResponder{}
+	testTSi := &message.TrafficSelectorResponder{}
 
-	testIndividualTS := &IndividualTrafficSelector{}
+	testIndividualTS := &message.IndividualTrafficSelector{}
 
 	testIndividualTS.TSType = 7
 	testIndividualTS.IPProtocolID = 6
@@ -249,7 +251,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	testTSi.TrafficSelectors = append(testTSi.TrafficSelectors, testIndividualTS)
 
-	testIndividualTS = &IndividualTrafficSelector{}
+	testIndividualTS = &message.IndividualTrafficSelector{}
 
 	testIndividualTS.TSType = 8
 	testIndividualTS.IPProtocolID = 6
@@ -263,11 +265,11 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testTSi)
 
-	testCP := new(Configuration)
+	testCP := new(message.Configuration)
 
 	testCP.ConfigurationType = 1
 
-	testIndividualConfigurationAttribute := new(IndividualConfigurationAttribute)
+	testIndividualConfigurationAttribute := new(message.IndividualConfigurationAttribute)
 
 	testIndividualConfigurationAttribute.Type = 1
 	testIndividualConfigurationAttribute.Value = []byte{10, 1, 14, 1}
@@ -276,18 +278,18 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testCP)
 
-	testEAP := new(EAP)
+	testEAP := new(message.EAP)
 
 	testEAP.Code = 1
 	testEAP.Identifier = 123
 
-	testEAPExpanded := new(EAPExpanded)
+	testEAPExpanded := new(message.EAPExpanded)
 
 	testEAPExpanded.VendorID = 26838
 	testEAPExpanded.VendorType = 1
 	testEAPExpanded.VendorData = []byte{9, 4, 8, 7}
 
-	testEAPNotification := new(EAPNotification)
+	testEAPNotification := new(message.EAPNotification)
 
 	rawstr := "I'm tired"
 	testEAPNotification.NotificationData = []byte(rawstr)
@@ -296,11 +298,11 @@ func TestEncodeDecode(t *testing.T) {
 
 	testPacket.Payloads = append(testPacket.Payloads, testEAP)
 
-	testSK := new(Encrypted)
+	testSK := new(message.Encrypted)
 
-	testSK.NextPayload = TypeSA
+	testSK.NextPayload = message.TypeSA
 
-	ikePayload := IKEPayloadContainer{
+	ikePayload := message.IKEPayloadContainer{
 		testSA,
 		testAuth,
 	}
@@ -343,7 +345,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	var dataFirstEncode, dataSecondEncode []byte
 	var err error
-	decodedPacket := new(IKEMessage)
+	decodedPacket := new(message.IKEMessage)
 
 	if dataFirstEncode, err = testPacket.Encode(); err != nil {
 		t.Fatalf("Encode failed: %+v", err)
@@ -424,7 +426,7 @@ func TestEncodeDecodeUsingPublicData(t *testing.T) {
 		0xde, 0x7f, 0x00, 0xd6, 0xc2, 0xd3,
 	}
 
-	ikePacket := new(IKEMessage)
+	ikePacket := new(message.IKEMessage)
 	err := ikePacket.Decode(data)
 	if err != nil {
 		t.Fatalf("Decode failed: %+v", err)

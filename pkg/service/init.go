@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/vishvananda/netlink"
+
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_service "github.com/free5gc/tngf/internal/ngap/service"
 	nwtcp_service "github.com/free5gc/tngf/internal/nwtcp/service"
@@ -22,8 +25,6 @@ import (
 	ike_service "github.com/free5gc/tngf/pkg/ike/service"
 	"github.com/free5gc/tngf/pkg/ike/xfrm"
 	radius_service "github.com/free5gc/tngf/pkg/radius/service"
-	"github.com/sirupsen/logrus"
-	"github.com/vishvananda/netlink"
 )
 
 type TngfApp struct {
@@ -32,7 +33,14 @@ type TngfApp struct {
 }
 
 func NewApp(cfg *factory.Config) (*TngfApp, error) {
-	tngf := &TngfApp{cfg: cfg}
+	if !util.InitTNGFContext() {
+		logger.InitLog.Error("Initicating context failed")
+		return nil, fmt.Errorf("Initicating context failed")
+	}
+	tngf := &TngfApp{
+		cfg:     cfg,
+		tngfCtx: tngf_context.TNGFSelf(),
+	}
 	tngf.SetLogEnable(cfg.GetLogEnable())
 	tngf.SetLogLevel(cfg.GetLogLevel())
 	tngf.SetReportCaller(cfg.GetLogReportCaller())
@@ -84,11 +92,6 @@ func (a *TngfApp) SetReportCaller(reportCaller bool) {
 
 func (a *TngfApp) Start(tlsKeyLogPath string) {
 	logger.InitLog.Infoln("Server started")
-
-	if !util.InitTNGFContext() {
-		logger.InitLog.Error("Initicating context failed")
-		return
-	}
 
 	if err := a.InitDefaultXfrmInterface(); err != nil {
 		logger.InitLog.Errorf("Initicating XFRM interface for control plane failed: %+v", err)
@@ -182,8 +185,8 @@ func (a *TngfApp) InitDefaultXfrmInterface() error {
 		Dst:       tngfContext.Subnet,
 	}
 
-	if err := netlink.RouteAdd(route); err != nil {
-		logger.InitLog.Warnf("netlink.RouteAdd: %+v", err)
+	if routeadd_err := netlink.RouteAdd(route); routeadd_err != nil {
+		logger.InitLog.Warnf("netlink.RouteAdd: %+v", routeadd_err)
 	}
 
 	logger.InitLog.Infof("Setup XFRM interface %s ", newXfrmiName)

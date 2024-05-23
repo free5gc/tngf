@@ -28,14 +28,14 @@ func Run() error {
 		return errors.New("Radius service run failed")
 	}
 
-	// Listen and serve
-	var errChan chan error
+	// // Listen and serve
+	// var errChan chan error
 
 	// Port 1812
-	errChan = make(chan error)
+	errChan := make(chan error)
 	go listenAndServe(udpAddrPort1812, errChan)
-	if err, ok := <-errChan; ok {
-		radiusLog.Errorln(err)
+	if chan_err, ok := <-errChan; ok {
+		radiusLog.Errorln(chan_err)
 		return errors.New("Radius service run failed")
 	}
 
@@ -63,9 +63,9 @@ func listenAndServe(localAddr *net.UDPAddr, errChan chan<- error) {
 	data := make([]byte, 65535)
 
 	for {
-		n, remoteAddr, err := listener.ReadFromUDP(data)
-		if err != nil {
-			radiusLog.Errorf("ReadFromUDP failed: %+v", err)
+		n, remoteAddr, udpread_err := listener.ReadFromUDP(data)
+		if udpread_err != nil {
+			radiusLog.Errorf("ReadFromUDP failed: %+v", udpread_err)
 			continue
 		}
 
