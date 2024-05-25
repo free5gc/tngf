@@ -1756,6 +1756,7 @@ func HandlePDUSessionResourceModifyRequest(amf *context.TNGFAMF, message *ngapTy
 	// ngap_message.SendPDUSessionResourceModifyResponse(amf, tngfUe, responseList, failedListModRes, nil)
 }
 
+// temporarily unused function
 // nolint
 func handlePDUSessionResourceModifyRequestTransfer(
 	pduSession *context.PDUSession, transfer ngapType.PDUSessionResourceModifyRequestTransfer) (
@@ -2717,6 +2718,7 @@ func buildCause(present int, value aper.Enumerated) (cause *ngapType.Cause) {
 	return
 }
 
+// temporarily unused function
 // nolint
 func printAndGetCause(cause *ngapType.Cause) (present int, value aper.Enumerated) {
 	present = cause.Present
@@ -2775,6 +2777,7 @@ func printCriticalityDiagnostics(criticalityDiagnostics *ngapType.CriticalityDia
 	}
 }
 
+// temporarily unused function
 // nolint
 func getPDUSessionResourceReleaseResponseTransfer() []byte {
 	data := ngapType.PDUSessionResourceReleaseResponseTransfer{}

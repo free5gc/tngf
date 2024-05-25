@@ -28,9 +28,7 @@ func Run() error {
 		return errors.New("Radius service run failed")
 	}
 
-	// // Listen and serve
-	// var errChan chan error
-
+	// Listen and serve
 	// Port 1812
 	errChan := make(chan error)
 	go listenAndServe(udpAddrPort1812, errChan)

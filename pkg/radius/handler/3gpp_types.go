@@ -258,9 +258,6 @@ func UnmarshalEAP5GData(codedData []byte) (
 							if len(parameterValue) < int(parameterLength) {
 								return 0, nil, nil, errors.New("Error formatting")
 							}
-							// else {
-							// 	parameterValue = parameterValue[:parameterLength]
-							// }
 						} else {
 							radiusLog.Warn("AN-Parameter selected NID field empty")
 						}
