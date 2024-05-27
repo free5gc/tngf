@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net"
-	// "encoding/hex"
 
 	radius_message "github.com/free5gc/tngf/pkg/radius/message"
 )

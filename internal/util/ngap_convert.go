@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/free5gc/aper"
+	"github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/pkg/context"
-	"github.com/free5gc/ngap/ngapType"
 )
 
 func PlmnIdToNgap(plmnId context.PLMNID) (ngapPlmnId ngapType.PLMNIdentity) {

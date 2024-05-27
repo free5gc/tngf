@@ -39,10 +39,8 @@ func GenerateRandomNumber() *big.Int {
 		if err != nil {
 			ikeLog.Errorf("Error occurs when generate random number: %+v", err)
 			return nil
-		} else {
-			if number.Cmp(&randomNumberMinimum) == 1 {
-				break
-			}
+		} else if number.Cmp(&randomNumberMinimum) == 1 {
+			break
 		}
 	}
 	return number
@@ -90,7 +88,8 @@ const (
 )
 
 func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
-	diffieHellmanGroupNumber uint16) (localPublicValue []byte, sharedKey []byte) {
+	diffieHellmanGroupNumber uint16,
+) (localPublicValue []byte, sharedKey []byte) {
 	peerPublicValueBig := new(big.Int).SetBytes(peerPublicValue)
 	var generator, factor *big.Int
 	var ok bool
@@ -114,7 +113,7 @@ func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 		}
 	default:
 		ikeLog.Errorf("Unsupported Diffie-Hellman group: %d", diffieHellmanGroupNumber)
-		return
+		return nil, nil
 	}
 
 	localPublicValue = new(big.Int).Exp(generator, secret, factor).Bytes()
@@ -394,8 +393,7 @@ func GenerateKeyForIKESA(ikeSecurityAssociation *context.IKESecurityAssociation)
 	var keyStream, generatedKeyBlock []byte
 	var index byte
 	for index = 1; len(keyStream) < totalKeyLength; index++ {
-		if pseudorandomFunction, ok =
-			NewPseudorandomFunction(SKEYSEED, transformPseudorandomFunction.TransformID); !ok {
+		if pseudorandomFunction, ok = NewPseudorandomFunction(SKEYSEED, transformPseudorandomFunction.TransformID); !ok {
 			ikeLog.Error("Get an unsupported pseudorandom funcion. This may imply an unsupported transform is chosen.")
 			return errors.New("New pseudorandom function failed")
 		}
@@ -440,7 +438,8 @@ func GenerateKeyForIKESA(ikeSecurityAssociation *context.IKESecurityAssociation)
 
 // Key Gen for child SA
 func GenerateKeyForChildSA(ikeSecurityAssociation *context.IKESecurityAssociation,
-	childSecurityAssociation *context.ChildSecurityAssociation) error {
+	childSecurityAssociation *context.ChildSecurityAssociation,
+) error {
 	// Check parameters
 	if ikeSecurityAssociation == nil {
 		return errors.New("IKE SA is nil")
@@ -473,8 +472,7 @@ func GenerateKeyForChildSA(ikeSecurityAssociation *context.IKESecurityAssociatio
 	// 	ikeSecurityAssociation.IKEAuthResponseSA.Proposals[0].EncryptionAlgorithm[0]
 	var transformIntegrityAlgorithmForIPSec *message.Transform
 	if len(ikeSecurityAssociation.IKEAuthResponseSA.Proposals[0].IntegrityAlgorithm) != 0 {
-		transformIntegrityAlgorithmForIPSec =
-			ikeSecurityAssociation.IKEAuthResponseSA.Proposals[0].IntegrityAlgorithm[0]
+		transformIntegrityAlgorithmForIPSec = ikeSecurityAssociation.IKEAuthResponseSA.Proposals[0].IntegrityAlgorithm[0]
 	}
 
 	// // Get key length for encryption and integrity key for IPSec
@@ -484,13 +482,13 @@ func GenerateKeyForChildSA(ikeSecurityAssociation *context.IKESecurityAssociatio
 	var ok bool
 
 	/*
-	if lengthEncryptionKeyIPSec, ok = getKeyLength(transformEncryptionAlgorithmForIPSec.TransformType,
-		transformEncryptionAlgorithmForIPSec.TransformID,
-		transformEncryptionAlgorithmForIPSec.AttributePresent,
-		transformEncryptionAlgorithmForIPSec.AttributeValue); !ok {
-		ikeLog.Error("Get key length of an unsupported algorithm. This may imply an unsupported transform is chosen.")
-		return errors.New("Get key length failed")
-	}
+		if lengthEncryptionKeyIPSec, ok = getKeyLength(transformEncryptionAlgorithmForIPSec.TransformType,
+			transformEncryptionAlgorithmForIPSec.TransformID,
+			transformEncryptionAlgorithmForIPSec.AttributePresent,
+			transformEncryptionAlgorithmForIPSec.AttributeValue); !ok {
+			ikeLog.Error("Get key length of an unsupported algorithm. This may imply an unsupported transform is chosen.")
+			return errors.New("Get key length failed")
+		}
 	*/
 	if transformIntegrityAlgorithmForIPSec != nil {
 		if lengthIntegrityKeyIPSec, ok = getKeyLength(transformIntegrityAlgorithmForIPSec.TransformType,
@@ -525,27 +523,28 @@ func GenerateKeyForChildSA(ikeSecurityAssociation *context.IKESecurityAssociatio
 	}
 
 	/*
-	childSecurityAssociation.InitiatorToResponderEncryptionKey =
-		append(childSecurityAssociation.InitiatorToResponderEncryptionKey, keyStream[:lengthEncryptionKeyIPSec]...)
-	keyStream = keyStream[lengthEncryptionKeyIPSec:]
+		childSecurityAssociation.InitiatorToResponderEncryptionKey =
+			append(childSecurityAssociation.InitiatorToResponderEncryptionKey, keyStream[:lengthEncryptionKeyIPSec]...)
+		keyStream = keyStream[lengthEncryptionKeyIPSec:]
 	*/
-	childSecurityAssociation.InitiatorToResponderIntegrityKey =
-		append(childSecurityAssociation.InitiatorToResponderIntegrityKey, keyStream[:lengthIntegrityKeyIPSec]...)
+	childSecurityAssociation.InitiatorToResponderIntegrityKey = append(
+		childSecurityAssociation.InitiatorToResponderIntegrityKey, keyStream[:lengthIntegrityKeyIPSec]...)
 	keyStream = keyStream[lengthIntegrityKeyIPSec:]
 	/*
-	childSecurityAssociation.ResponderToInitiatorEncryptionKey =
-		append(childSecurityAssociation.ResponderToInitiatorEncryptionKey, keyStream[:lengthEncryptionKeyIPSec]...)
-	keyStream = keyStream[lengthEncryptionKeyIPSec:]
+		childSecurityAssociation.ResponderToInitiatorEncryptionKey =
+			append(childSecurityAssociation.ResponderToInitiatorEncryptionKey, keyStream[:lengthEncryptionKeyIPSec]...)
+		keyStream = keyStream[lengthEncryptionKeyIPSec:]
 	*/
-	childSecurityAssociation.ResponderToInitiatorIntegrityKey =
-		append(childSecurityAssociation.ResponderToInitiatorIntegrityKey, keyStream[:lengthIntegrityKeyIPSec]...)
+	childSecurityAssociation.ResponderToInitiatorIntegrityKey = append(
+		childSecurityAssociation.ResponderToInitiatorIntegrityKey, keyStream[:lengthIntegrityKeyIPSec]...)
 
 	return nil
 }
 
 // Decrypt
 func DecryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation, ikeMessage *message.IKEMessage,
-	encryptedPayload *message.Encrypted) (message.IKEPayloadContainer, error) {
+	encryptedPayload *message.Encrypted,
+) (message.IKEPayloadContainer, error) {
 	// Check parameters
 	if ikeSecurityAssociation == nil {
 		return nil, errors.New("IKE SA is nil")
@@ -626,7 +625,8 @@ func DecryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation, ik
 
 // Encrypt
 func EncryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation,
-	ikePayload message.IKEPayloadContainer, responseIKEMessage *message.IKEMessage) error {
+	ikePayload message.IKEPayloadContainer, responseIKEMessage *message.IKEMessage,
+) error {
 	// Check parameters
 	if ikeSecurityAssociation == nil {
 		return errors.New("IKE SA is nil")
@@ -702,7 +702,8 @@ func EncryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation,
 
 // Get information of algorithm
 func getKeyLength(transformType uint8, transformID uint16, attributePresent bool,
-	attributeValue uint16) (int, bool) {
+	attributeValue uint16,
+) (int, bool) {
 	switch transformType {
 	case message.TypeEncryptionAlgorithm:
 		switch transformID {
@@ -836,7 +837,8 @@ func getKeyLength(transformType uint8, transformID uint16, attributePresent bool
 }
 
 func getOutputLength(transformType uint8, transformID uint16, attributePresent bool,
-	attributeValue uint16) (int, bool) {
+	attributeValue uint16,
+) (int, bool) {
 	switch transformType {
 	case message.TypePseudorandomFunction:
 		switch transformID {
@@ -871,12 +873,13 @@ func getOutputLength(transformType uint8, transformID uint16, attributePresent b
 	}
 }
 
-func concatenateNonceAndSPI(nonce []byte, SPI_initiator uint64, SPI_responder uint64) []byte {
+func concatenateNonceAndSPI(nonce []byte, spi_initiator uint64, spi_responder uint64) []byte {
 	spi := make([]byte, 8)
 
-	binary.BigEndian.PutUint64(spi, SPI_initiator)
-	newSlice := append(nonce, spi...)
-	binary.BigEndian.PutUint64(spi, SPI_responder)
+	binary.BigEndian.PutUint64(spi, spi_initiator)
+	newSlice := nonce
+	newSlice = append(newSlice, spi...)
+	binary.BigEndian.PutUint64(spi, spi_responder)
 	newSlice = append(newSlice, spi...)
 
 	return newSlice

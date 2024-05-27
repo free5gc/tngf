@@ -2,7 +2,6 @@ package radius
 
 import (
 	"net"
-	// "fmt"
 	"runtime/debug"
 
 	"github.com/sirupsen/logrus"

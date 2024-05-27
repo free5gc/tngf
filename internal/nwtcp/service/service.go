@@ -84,8 +84,8 @@ func listenAndServe(tcpListener net.Listener) {
 
 		if ue.TemporaryCachedNASMessage != nil {
 			// Send to UE
-			if n, err := connection.Write(ue.TemporaryCachedNASMessage); err != nil {
-				nwtcpLog.Errorf("Writing via IPSec signalling SA failed: %+v", err)
+			if n, write_err := connection.Write(ue.TemporaryCachedNASMessage); write_err != nil {
+				nwtcpLog.Errorf("Writing via IPSec signaling SA failed: %+v", write_err)
 			} else {
 				nwtcpLog.Trace("Forward NWt <- N2")
 				nwtcpLog.Tracef("Wrote %d bytes", n)

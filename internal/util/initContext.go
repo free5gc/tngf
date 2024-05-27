@@ -6,13 +6,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 
-	"git.cs.nctu.edu.tw/calee/sctp"
 	"github.com/sirupsen/logrus"
 
+	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/pkg/context"
 	"github.com/free5gc/tngf/pkg/factory"
@@ -125,7 +125,7 @@ func InitTNGFContext() bool {
 			keyPath = factory.TngfConfig.Configuration.PrivateKey
 		}
 
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read private key data from file: %+v", err)
 			return false
@@ -146,8 +146,8 @@ func InitTNGFContext() bool {
 				return false
 			}
 		}
-		rsaKey, ok := key.(*rsa.PrivateKey)
-		if !ok {
+		rsaKey, key_ok := key.(*rsa.PrivateKey)
+		if !key_ok {
 			contextLog.Error("Private key is not an rsa private key")
 			return false
 		}
@@ -167,7 +167,7 @@ func InitTNGFContext() bool {
 		}
 
 		// Read .pem
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read certificate authority data from file: %+v", err)
 			return false
@@ -186,8 +186,8 @@ func InitTNGFContext() bool {
 		}
 		// Get sha1 hash of subject public key info
 		sha1Hash := sha1.New()
-		if _, err := sha1Hash.Write(cert.RawSubjectPublicKeyInfo); err != nil {
-			contextLog.Errorf("Hash function writing failed: %+v", err)
+		if _, write_err := sha1Hash.Write(cert.RawSubjectPublicKeyInfo); write_err != nil {
+			contextLog.Errorf("Hash function writing failed: %+v", write_err)
 			return false
 		}
 
@@ -206,7 +206,7 @@ func InitTNGFContext() bool {
 		}
 
 		// Read .pem
-		content, err := ioutil.ReadFile(keyPath)
+		content, err := os.ReadFile(keyPath)
 		if err != nil {
 			contextLog.Errorf("Cannot read certificate data from file: %+v", err)
 			return false
@@ -326,19 +326,19 @@ func formatSupportedTAList(info *context.TNGFNFInfo) bool {
 	return true
 }
 
-func GetInterfaceName(IPAddress string) (interfaceName string, err error) {
+func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return "nil", err
 	}
 
 	for _, inter := range interfaces {
-		addrs, err := inter.Addrs()
-		if err != nil {
-			return "nil", err
+		addrs, addr_err := inter.Addrs()
+		if addr_err != nil {
+			return "nil", addr_err
 		}
 		for _, addr := range addrs {
-			if IPAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
+			if ipAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
 				return inter.Name, nil
 			}
 		}

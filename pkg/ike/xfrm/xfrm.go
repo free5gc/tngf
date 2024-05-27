@@ -59,7 +59,8 @@ func (xfrmIntegrityAlgorithmType XFRMIntegrityAlgorithmType) String() string {
 }
 
 func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
-	childSecurityAssociation *context.ChildSecurityAssociation) error {
+	childSecurityAssociation *context.ChildSecurityAssociation,
+) error {
 	// Build XFRM information data structure for incoming traffic.
 
 	// Direction: {private_network} -> this_server
@@ -233,7 +234,8 @@ func printSAInfo(tngf_is_initiator bool, xfrmiId uint32, childSecurityAssociatio
 }
 
 func SetupIPsecXfrmi(xfrmIfaceName, parentIfaceName string, xfrmIfaceId uint32,
-	xfrmIfaceAddr net.IPNet) (netlink.Link, error) {
+	xfrmIfaceAddr net.IPNet,
+) (netlink.Link, error) {
 	var (
 		xfrmi, parent netlink.Link
 		err           error
@@ -267,13 +269,13 @@ func SetupIPsecXfrmi(xfrmIfaceName, parentIfaceName string, xfrmIfaceId uint32,
 		IPNet: &xfrmIfaceAddr,
 	}
 
-	if err := netlink.AddrAdd(xfrmi, linkIPSecAddr); err != nil {
-		return nil, err
+	if add_err := netlink.AddrAdd(xfrmi, linkIPSecAddr); add_err != nil {
+		return nil, add_err
 	}
 
 	// ip link set <xfrmIfaceName> up
-	if err := netlink.LinkSetUp(xfrmi); err != nil {
-		return nil, err
+	if link_err := netlink.LinkSetUp(xfrmi); link_err != nil {
+		return nil, link_err
 	}
 
 	return xfrmi, nil

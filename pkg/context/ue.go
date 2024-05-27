@@ -8,9 +8,9 @@ import (
 	"github.com/vishvananda/netlink"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
 
-	ike_message "github.com/free5gc/tngf/pkg/ike/message"
-	"github.com/free5gc/ngap/ngapType"
 	"github.com/free5gc/nas/nasType"
+	"github.com/free5gc/ngap/ngapType"
+	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 )
 
 const (
@@ -59,18 +59,18 @@ type TNGFUe struct {
 	TemporaryCachedNASMessage []byte
 
 	/* Security */
-	Ktngf               []uint8                          // 32 bytes (256 bits), value is from NGAP IE "Security Key"
-	Ktnap               []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
-	Ktipsec             []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
+	Ktngf                []uint8                          // 32 bytes (256 bits), value is from NGAP IE "Security Key"
+	Ktnap                []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
+	Ktipsec              []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
 	SecurityCapabilities *ngapType.UESecurityCapabilities // TS 38.413 9.3.1.86
 
 	/* IKE Security Association */
 	TNGFIKESecurityAssociation   *IKESecurityAssociation
 	TNGFChildSecurityAssociation map[uint32]*ChildSecurityAssociation // inbound SPI as key
-	SignallingIPsecSAEstablished  bool
+	SignallingIPsecSAEstablished bool
 
 	// RADIUS Session
-	RadiusSession            *RadiusSession
+	RadiusSession *RadiusSession
 
 	/* Temporary Mapping of two SPIs */
 	// Exchange Message ID(including a SPI) and ChildSA(including a SPI)
@@ -221,7 +221,7 @@ type ChildSecurityAssociation struct {
 
 	// Encapsulate
 	EnableEncapsulate bool
-	TNGFPort         int
+	TNGFPort          int
 	NATPort           int
 
 	// PDU Session IDs associated with this child SA
@@ -232,9 +232,9 @@ type ChildSecurityAssociation struct {
 }
 
 type UDPSocketInfo struct {
-	Conn      *net.UDPConn
+	Conn     *net.UDPConn
 	TNGFAddr *net.UDPAddr
-	UEAddr    *net.UDPAddr
+	UEAddr   *net.UDPAddr
 }
 
 func (ue *TNGFUe) init(ranUeNgapId int64) {
@@ -292,7 +292,8 @@ func (ue *TNGFUe) CreateHalfChildSA(msgID, inboundSPI uint32, pduSessionID int64
 }
 
 func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
-	chosenSecurityAssociation *ike_message.SecurityAssociation) (*ChildSecurityAssociation, error) {
+	chosenSecurityAssociation *ike_message.SecurityAssociation,
+) (*ChildSecurityAssociation, error) {
 	childSA, ok := ue.TemporaryExchangeMsgIDChildSAMapping[msgID]
 
 	if !ok {

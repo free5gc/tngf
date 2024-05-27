@@ -13,8 +13,8 @@ type TNGFNFInfo struct {
 }
 
 type GlobalTNGFID struct {
-	PLMNID  PLMNID `yaml:"PLMNID" valid:"required"`
-	TNGFID  uint32 `yaml:"TNGFID" valid:"range(0|65535),required"` // with length 2 bytes
+	PLMNID PLMNID `yaml:"PLMNID" valid:"required"`
+	TNGFID uint32 `yaml:"TNGFID" valid:"range(0|65535),required"` // with length 2 bytes
 }
 
 type SupportedTAItem struct {

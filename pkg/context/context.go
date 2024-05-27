@@ -4,25 +4,28 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/hex"
+	"fmt"
 	"math"
 	"math/big"
 	"net"
+	"strings"
 	"sync"
 
-	"git.cs.nctu.edu.tw/calee/sctp"
 	"github.com/sirupsen/logrus"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
 	"golang.org/x/net/ipv4"
 
-	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/sctp"
+	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/util/idgenerator"
-	// "fmt"
 )
 
 var contextLog *logrus.Entry
 
 var tngfContext = TNGFContext{}
+
+const RadiusDefaultSecret = "free5GC"
 
 type TNGFContext struct {
 	NFInfo           TNGFNFInfo
@@ -47,10 +50,10 @@ type TNGFContext struct {
 	FQDN string
 
 	// Security data
-	CertificateAuthority  []byte
-	TNGFCertificate       []byte
-	TNGFPrivateKey        *rsa.PrivateKey
-	RadiusSecret          string
+	CertificateAuthority []byte
+	TNGFCertificate      []byte
+	TNGFPrivateKey       *rsa.PrivateKey
+	RadiusSecret         string
 
 	// UEIPAddressRange
 	Subnet *net.IPNet
@@ -108,6 +111,7 @@ func (context *TNGFContext) RadiusSessionPoolLoad(ranUeNgapId string) (*RadiusSe
 		return nil, ok
 	}
 }
+
 func (context *TNGFContext) NewTngfUe() *TNGFUe {
 	ranUeNgapId, err := context.RANUENGAPIDGenerator.Allocate()
 	if err != nil {
@@ -201,7 +205,7 @@ func (context *TNGFContext) DeleteIKESecurityAssociation(spi uint64) {
 	context.IKESA.Delete(spi)
 }
 
-func (context *TNGFContext) UELoadbyIDi(idi []byte) (*TNGFUe) {
+func (context *TNGFContext) UELoadbyIDi(idi []byte) *TNGFUe {
 	var ue *TNGFUe
 	context.UePool.Range(func(_, thisUE interface{}) bool {
 		strIdi := hex.EncodeToString(idi)
@@ -302,7 +306,8 @@ func (context *TNGFContext) AllocatedUETEIDLoad(teid uint32) (*TNGFUe, bool) {
 }
 
 func (context *TNGFContext) AMFSelection(ueSpecifiedGUAMI *ngapType.GUAMI,
-	ueSpecifiedPLMNId *ngapType.PLMNIdentity) *TNGFAMF {
+	ueSpecifiedPLMNId *ngapType.PLMNIdentity,
+) *TNGFAMF {
 	var availableAMF *TNGFAMF
 	context.AMFPool.Range(func(key, value interface{}) bool {
 		amf := value.(*TNGFAMF)
@@ -340,4 +345,24 @@ func generateRandomIPinRange(subnet *net.IPNet) net.IP {
 	}
 
 	return net.IPv4(ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3])
+}
+
+func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "nil", err
+	}
+
+	for _, inter := range interfaces {
+		addrs, addr_err := inter.Addrs()
+		if addr_err != nil {
+			return "nil", addr_err
+		}
+		for _, addr := range addrs {
+			if ipAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
+				return inter.Name, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Cannot find interface name")
 }

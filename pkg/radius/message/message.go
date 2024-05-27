@@ -21,16 +21,17 @@ func init() {
 }
 
 type RadiusMessage struct {
-	Code      uint8
-	PktID     uint8
-	Length    uint16
-	Auth      []byte
-	Payloads  RadiusPayloadContainer
+	Code     uint8
+	PktID    uint8
+	Length   uint16
+	Auth     []byte
+	Payloads RadiusPayloadContainer
 }
 
 func GetResponseAuth(message []byte) []byte {
 	tngfSelf := context.TNGFSelf()
-	catData := append(message, []byte(tngfSelf.RadiusSecret)...)
+	catData := message
+	catData = append(catData, []byte(tngfSelf.RadiusSecret)...)
 	responseAuth := md5.Sum(catData)
 	return responseAuth[:]
 }
@@ -88,9 +89,9 @@ func (radiusMessage *RadiusMessage) Decode(rawData []byte) error {
 type RadiusPayloadContainer []RadiusPayload
 
 type RadiusPayload struct {
-	Type    uint8
-	Length  uint8
-	Val     []byte
+	Type   uint8
+	Length uint8
+	Val    []byte
 }
 
 func (container *RadiusPayloadContainer) Encode() ([]byte, error) {
@@ -160,7 +161,7 @@ type EAP struct {
 }
 
 func (eap *EAP) Marshal() ([]byte, error) {
-	radiusLog.Debugln("[EAP] marshal(): Start marshalling")
+	radiusLog.Debugln("[EAP] marshal(): Start marshaling")
 
 	eapData := make([]byte, 4)
 
@@ -256,7 +257,7 @@ type EAPIdentity struct {
 func (eapIdentity *EAPIdentity) Type() EAPType { return EAPTypeIdentity }
 
 func (eapIdentity *EAPIdentity) marshal() ([]byte, error) {
-	radiusLog.Debugln("[EAP][Identity] marshal(): Start marshalling")
+	radiusLog.Debugln("[EAP][Identity] marshal(): Start marshaling")
 
 	if len(eapIdentity.IdentityData) == 0 {
 		return nil, errors.New("EAPIdentity: EAP identity is empty")
@@ -290,7 +291,7 @@ type EAPNotification struct {
 func (eapNotification *EAPNotification) Type() EAPType { return EAPTypeNotification }
 
 func (eapNotification *EAPNotification) marshal() ([]byte, error) {
-	radiusLog.Debugln("[EAP][Notification] marshal(): Start marshalling")
+	radiusLog.Debugln("[EAP][Notification] marshal(): Start marshaling")
 
 	if len(eapNotification.NotificationData) == 0 {
 		return nil, errors.New("EAPNotification: EAP notification is empty")
@@ -324,7 +325,7 @@ type EAPNak struct {
 func (eapNak *EAPNak) Type() EAPType { return EAPTypeNak }
 
 func (eapNak *EAPNak) marshal() ([]byte, error) {
-	radiusLog.Debugln("[EAP][Nak] marshal(): Start marshalling")
+	radiusLog.Debugln("[EAP][Nak] marshal(): Start marshaling")
 
 	if len(eapNak.NakData) == 0 {
 		return nil, errors.New("EAPNak: EAP nak is empty")
@@ -360,7 +361,7 @@ type EAPExpanded struct {
 func (eapExpanded *EAPExpanded) Type() EAPType { return EAPTypeExpanded }
 
 func (eapExpanded *EAPExpanded) marshal() ([]byte, error) {
-	radiusLog.Debugln("[EAP][Expanded] marshal(): Start marshalling")
+	radiusLog.Debugln("[EAP][Expanded] marshal(): Start marshaling")
 
 	eapExpandedData := make([]byte, 8)
 
@@ -410,7 +411,7 @@ type RadiusMicrosoftVendorSpecific struct {
 }
 
 func (vendorSpecific *RadiusMicrosoftVendorSpecific) marshal() ([]byte, error) {
-	radiusLog.Debugln("[RADIUS][VendorSpecific] marshal(): Start marshalling")
+	radiusLog.Debugln("[RADIUS][VendorSpecific] marshal(): Start marshaling")
 
 	vendorSpecificData := make([]byte, 2)
 
@@ -420,4 +421,3 @@ func (vendorSpecific *RadiusMicrosoftVendorSpecific) marshal() ([]byte, error) {
 
 	return vendorSpecificData, nil
 }
-

@@ -39,16 +39,16 @@ func Run() error {
 	// Port 500
 	errChan = make(chan error)
 	go listenAndServe(udpAddrPort500, errChan)
-	if err, ok := <-errChan; ok {
-		ikeLog.Errorln(err)
+	if chan_err, ok := <-errChan; ok {
+		ikeLog.Errorln(chan_err)
 		return errors.New("IKE service run failed")
 	}
 
 	// Port 4500
 	errChan = make(chan error)
 	go listenAndServe(udpAddrPort4500, errChan)
-	if err, ok := <-errChan; ok {
-		ikeLog.Errorln(err)
+	if chan_err, ok := <-errChan; ok {
+		ikeLog.Errorln(chan_err)
 		return errors.New("IKE service run failed")
 	}
 
@@ -75,9 +75,9 @@ func listenAndServe(localAddr *net.UDPAddr, errChan chan<- error) {
 	data := make([]byte, 65535)
 
 	for {
-		n, remoteAddr, err := listener.ReadFromUDP(data)
-		if err != nil {
-			ikeLog.Errorf("ReadFromUDP failed: %+v", err)
+		n, remoteAddr, udpread_err := listener.ReadFromUDP(data)
+		if udpread_err != nil {
+			ikeLog.Errorf("ReadFromUDP failed: %+v", udpread_err)
 			continue
 		}
 

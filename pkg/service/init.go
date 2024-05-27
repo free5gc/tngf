@@ -1,11 +1,10 @@
 package service
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
-	"os/exec"
 	"os/signal"
 	"runtime/debug"
 	"sync"
@@ -13,159 +12,88 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"github.com/vishvananda/netlink"
 
-	aperLogger "github.com/free5gc/aper/logger"
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_service "github.com/free5gc/tngf/internal/ngap/service"
 	nwtcp_service "github.com/free5gc/tngf/internal/nwtcp/service"
 	nwtup_service "github.com/free5gc/tngf/internal/nwtup/service"
 	"github.com/free5gc/tngf/internal/util"
 	"github.com/free5gc/tngf/pkg/context"
+	tngf_context "github.com/free5gc/tngf/pkg/context"
 	"github.com/free5gc/tngf/pkg/factory"
 	ike_service "github.com/free5gc/tngf/pkg/ike/service"
-	radius_service "github.com/free5gc/tngf/pkg/radius/service"
 	"github.com/free5gc/tngf/pkg/ike/xfrm"
-	ngapLogger "github.com/free5gc/ngap/logger"
+	radius_service "github.com/free5gc/tngf/pkg/radius/service"
 )
 
-type TNGF struct{}
-
-type (
-	// Commands information.
-	Commands struct {
-		config string
-	}
-)
-
-var commands Commands
-
-var cliCmd = []cli.Flag{
-	cli.StringFlag{
-		Name:  "config, c",
-		Usage: "Load configuration from `FILE`",
-	},
-	cli.StringFlag{
-		Name:  "log, l",
-		Usage: "Output NF log to `FILE`",
-	},
-	cli.StringFlag{
-		Name:  "log5gc, lc",
-		Usage: "Output free5gc log to `FILE`",
-	},
+type TngfApp struct {
+	cfg     *factory.Config
+	tngfCtx *tngf_context.TNGFContext
 }
 
-func (*TNGF) GetCliCmd() (flags []cli.Flag) {
-	return cliCmd
-}
-
-func (tngf *TNGF) Initialize(c *cli.Context) error {
-	commands = Commands{
-		config: c.String("config"),
-	}
-
-	if commands.config != "" {
-		if err := factory.InitConfigFactory(commands.config); err != nil {
-			return err
-		}
-	} else {
-		if err := factory.InitConfigFactory(util.TngfDefaultConfigPath); err != nil {
-			return err
-		}
-	}
-
-	tngf.SetLogLevel()
-
-	if err := factory.CheckConfigVersion(); err != nil {
-		return err
-	}
-
-	if _, err := factory.TngfConfig.Validate(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (tngf *TNGF) SetLogLevel() {
-	if factory.TngfConfig.Logger == nil {
-		logger.InitLog.Warnln("TNGF config without log level setting!!!")
-		return
-	}
-
-	if factory.TngfConfig.Logger.TNGF != nil {
-		if factory.TngfConfig.Logger.TNGF.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.TngfConfig.Logger.TNGF.DebugLevel); err != nil {
-				logger.InitLog.Warnf("TNGF Log level [%s] is invalid, set to [info] level",
-					factory.TngfConfig.Logger.TNGF.DebugLevel)
-				logger.SetLogLevel(logrus.InfoLevel)
-			} else {
-				logger.InitLog.Infof("TNGF Log level is set to [%s] level", level)
-				logger.SetLogLevel(level)
-			}
-		} else {
-			logger.InitLog.Infoln("TNGF Log level is default set to [info] level")
-			logger.SetLogLevel(logrus.InfoLevel)
-		}
-		logger.SetReportCaller(factory.TngfConfig.Logger.TNGF.ReportCaller)
-	}
-
-	if factory.TngfConfig.Logger.NGAP != nil {
-		if factory.TngfConfig.Logger.NGAP.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.TngfConfig.Logger.NGAP.DebugLevel); err != nil {
-				ngapLogger.NgapLog.Warnf("NGAP Log level [%s] is invalid, set to [info] level",
-					factory.TngfConfig.Logger.NGAP.DebugLevel)
-				ngapLogger.SetLogLevel(logrus.InfoLevel)
-			} else {
-				ngapLogger.SetLogLevel(level)
-			}
-		} else {
-			ngapLogger.NgapLog.Warnln("NGAP Log level not set. Default set to [info] level")
-			ngapLogger.SetLogLevel(logrus.InfoLevel)
-		}
-		ngapLogger.SetReportCaller(factory.TngfConfig.Logger.NGAP.ReportCaller)
-	}
-
-	if factory.TngfConfig.Logger.Aper != nil {
-		if factory.TngfConfig.Logger.Aper.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.TngfConfig.Logger.Aper.DebugLevel); err != nil {
-				aperLogger.AperLog.Warnf("Aper Log level [%s] is invalid, set to [info] level",
-					factory.TngfConfig.Logger.Aper.DebugLevel)
-				aperLogger.SetLogLevel(logrus.InfoLevel)
-			} else {
-				aperLogger.SetLogLevel(level)
-			}
-		} else {
-			aperLogger.AperLog.Warnln("Aper Log level not set. Default set to [info] level")
-			aperLogger.SetLogLevel(logrus.InfoLevel)
-		}
-		aperLogger.SetReportCaller(factory.TngfConfig.Logger.Aper.ReportCaller)
-	}
-}
-
-func (tngf *TNGF) FilterCli(c *cli.Context) (args []string) {
-	for _, flag := range tngf.GetCliCmd() {
-		name := flag.GetName()
-		value := fmt.Sprint(c.Generic(name))
-		if value == "" {
-			continue
-		}
-
-		args = append(args, "--"+name, value)
-	}
-	return args
-}
-
-func (tngf *TNGF) Start() {
-	logger.InitLog.Infoln("Server started")
-
+func NewApp(cfg *factory.Config) (*TngfApp, error) {
 	if !util.InitTNGFContext() {
 		logger.InitLog.Error("Initicating context failed")
+		return nil, fmt.Errorf("Initicating context failed")
+	}
+	tngf := &TngfApp{
+		cfg:     cfg,
+		tngfCtx: tngf_context.TNGFSelf(),
+	}
+	tngf.SetLogEnable(cfg.GetLogEnable())
+	tngf.SetLogLevel(cfg.GetLogLevel())
+	tngf.SetReportCaller(cfg.GetLogReportCaller())
+
+	return tngf, nil
+}
+
+func (a *TngfApp) SetLogEnable(enable bool) {
+	logger.MainLog.Infof("Log enable is set to[%v]", enable)
+	if enable && logger.Log.Out == os.Stderr {
+		return
+	} else if !enable && logger.Log.Out == io.Discard {
 		return
 	}
 
-	if err := tngf.InitDefaultXfrmInterface(); err != nil {
+	a.cfg.SetLogEnable(enable)
+	if enable {
+		logger.Log.SetOutput(os.Stderr)
+	} else {
+		logger.Log.SetOutput(io.Discard)
+	}
+}
+
+func (a *TngfApp) SetLogLevel(level string) {
+	lvl, err := logrus.ParseLevel(level)
+	if err != nil {
+		logger.MainLog.Warnf("Log level [%s] is invalid", level)
+		return
+	}
+
+	logger.MainLog.Infof("Log level is set to [%s]", level)
+	if lvl == logger.Log.GetLevel() {
+		return
+	}
+
+	a.cfg.SetLogLevel(level)
+	logger.Log.SetLevel(lvl)
+}
+
+func (a *TngfApp) SetReportCaller(reportCaller bool) {
+	logger.MainLog.Infof("Report Caller is set to [%v]", reportCaller)
+	if reportCaller == logger.Log.ReportCaller {
+		return
+	}
+
+	a.cfg.SetLogReportCaller(reportCaller)
+	logger.Log.SetReportCaller((reportCaller))
+}
+
+func (a *TngfApp) Start(tlsKeyLogPath string) {
+	logger.InitLog.Infoln("Server started")
+
+	if err := a.InitDefaultXfrmInterface(); err != nil {
 		logger.InitLog.Errorf("Initicating XFRM interface for control plane failed: %+v", err)
 		return
 	}
@@ -182,7 +110,7 @@ func (tngf *TNGF) Start() {
 		}()
 
 		<-signalChannel
-		tngf.Terminate()
+		a.Terminate()
 		// Waiting for negotiatioon with netlink for deleting interfaces
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
@@ -236,7 +164,7 @@ func (tngf *TNGF) Start() {
 	wg.Wait()
 }
 
-func (tngf *TNGF) InitDefaultXfrmInterface() error {
+func (a *TngfApp) InitDefaultXfrmInterface() error {
 	tngfContext := context.TNGFSelf()
 
 	// Setup default IPsec interface for Control Plane
@@ -257,8 +185,8 @@ func (tngf *TNGF) InitDefaultXfrmInterface() error {
 		Dst:       tngfContext.Subnet,
 	}
 
-	if err := netlink.RouteAdd(route); err != nil {
-		logger.InitLog.Warnf("netlink.RouteAdd: %+v", err)
+	if routeadd_err := netlink.RouteAdd(route); routeadd_err != nil {
+		logger.InitLog.Warnf("netlink.RouteAdd: %+v", routeadd_err)
 	}
 
 	logger.InitLog.Infof("Setup XFRM interface %s ", newXfrmiName)
@@ -269,7 +197,7 @@ func (tngf *TNGF) InitDefaultXfrmInterface() error {
 	return nil
 }
 
-func (tngf *TNGF) RemoveIPsecInterfaces() {
+func (a *TngfApp) RemoveIPsecInterfaces() {
 	tngfSelf := context.TNGFSelf()
 	tngfSelf.XfrmIfaces.Range(
 		func(key, value interface{}) bool {
@@ -283,77 +211,9 @@ func (tngf *TNGF) RemoveIPsecInterfaces() {
 		})
 }
 
-func (tngf *TNGF) Terminate() {
+func (a *TngfApp) Terminate() {
 	logger.InitLog.Info("Terminating TNGF...")
 	logger.InitLog.Info("Deleting interfaces created by TNGF")
-	tngf.RemoveIPsecInterfaces()
+	a.RemoveIPsecInterfaces()
 	logger.InitLog.Info("TNGF terminated")
-}
-
-func (tngf *TNGF) Exec(c *cli.Context) error {
-	// TNGF.Initialize(cfgPath, c)
-
-	logger.InitLog.Traceln("args:", c.String("tngfcfg"))
-	args := tngf.FilterCli(c)
-	logger.InitLog.Traceln("filter: ", args)
-	command := exec.Command("./tngf", args...)
-
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		logger.InitLog.Fatalln(err)
-	}
-	go func() {
-		defer func() {
-			if p := recover(); p != nil {
-				// Print stack for panic to log. Fatalf() will let program exit.
-				logger.InitLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
-			}
-		}()
-
-		in := bufio.NewScanner(stdout)
-		for in.Scan() {
-			fmt.Println(in.Text())
-		}
-		wg.Done()
-	}()
-
-	stderr, err := command.StderrPipe()
-	if err != nil {
-		logger.InitLog.Fatalln(err)
-	}
-	go func() {
-		defer func() {
-			if p := recover(); p != nil {
-				// Print stack for panic to log. Fatalf() will let program exit.
-				logger.InitLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
-			}
-		}()
-
-		in := bufio.NewScanner(stderr)
-		for in.Scan() {
-			fmt.Println(in.Text())
-		}
-		wg.Done()
-	}()
-
-	go func() {
-		defer func() {
-			if p := recover(); p != nil {
-				// Print stack for panic to log. Fatalf() will let program exit.
-				logger.InitLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
-			}
-		}()
-
-		if errCom := command.Start(); errCom != nil {
-			logger.InitLog.Errorf("TNGF start error: %v", errCom)
-		}
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	return err
 }
