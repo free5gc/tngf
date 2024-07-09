@@ -121,44 +121,122 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	case EAP5GNAS:
 		radiusLog.Infoln("Handle EAP-Res/5G-NAS")
-		var eap *radius_message.EAP
+		eap := &radius_message.EAP{}
 		err = eap.Unmarshal(eapMessage)
 		if err != nil {
 			radiusLog.Errorf("[EAP] EAP5GNAS unmarshal error: %+v", err)
 		}
-		if eap != nil {
-			if eap.Code != radius_message.EAPCodeResponse {
-				radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
+		if eap.Code != radius_message.EAPCodeResponse {
+			radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
+			return
+		}
+
+		eapTypeData := eap.EAPTypeData[0]
+		var eapExpanded *radius_message.EAPExpanded
+
+		switch eapTypeData.Type() {
+		case radius_message.EAPTypeExpanded:
+			eapExpanded = eapTypeData.(*radius_message.EAPExpanded)
+		default:
+			radiusLog.Errorf("[EAP] Received EAP packet with type other than EAP expanded type: %d", eapTypeData.Type())
+			return
+		}
+
+		if eapExpanded.VendorID != radius_message.VendorID3GPP {
+			radiusLog.Error("The peer sent EAP expended packet with wrong vendor ID. Drop the packet.")
+			return
+		}
+		if eapExpanded.VendorType != radius_message.VendorTypeEAP5G {
+			radiusLog.Error("The peer sent EAP expanded packet with wrong vendor type. Drop the packet.")
+			return
+		}
+
+		eap5GMessageID, anParameters, nasPDU, unmarshal_err := UnmarshalEAP5GData(eapExpanded.VendorData)
+		if unmarshal_err != nil {
+			radiusLog.Errorf("Unmarshalling EAP-5G packet failed: %+v", unmarshal_err)
+			return
+		}
+
+		if eap5GMessageID == radius_message.EAP5GType5GStop {
+			// Send EAP failure
+			// Build Radius message
+			responseRadiusMessage.BuildRadiusHeader(radius_message.AccessChallenge, message.PktID, message.Auth)
+			responseRadiusMessage.Payloads.Reset()
+
+			// EAP
+			identifier, random_err := GenerateRandomUint8()
+			if random_err != nil {
+				radiusLog.Errorf("Generate random uint8 failed: %+v", random_err)
 				return
 			}
+			responseRadiusPayload.BuildEAPfailure(identifier)
 
-			eapTypeData := eap.EAPTypeData[0]
-			var eapExpanded *radius_message.EAPExpanded
+			if requestMessageAuthenticator != nil {
+				tmpRadiusMessage := *responseRadiusMessage
+				payload := new(radius_message.RadiusPayload)
+				payload.Type = radius_message.TypeMessageAuthenticator
+				payload.Length = uint8(18)
+				payload.Val = make([]byte, 16)
 
-			switch eapTypeData.Type() {
-			case radius_message.EAPTypeExpanded:
-				eapExpanded = eapTypeData.(*radius_message.EAPExpanded)
-			default:
-				radiusLog.Errorf("[EAP] Received EAP packet with type other than EAP expanded type: %d", eapTypeData.Type())
-				return
+				tmpResponseRadiusPayload := responseRadiusPayload
+				tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+
+				tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
+
+				payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
+				responseRadiusPayload = append(responseRadiusPayload, *payload)
+			}
+			responseRadiusMessage.Payloads = responseRadiusPayload
+
+			// Send Radius message to UE
+			SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
+			return
+		}
+
+		// Send Initial UE Message or Uplink NAS Transport
+		if session.ThisUE == nil { // if anParameters != nil {
+			// print AN parameters
+			radiusLog.Debug("Select AMF with the following AN parameters:")
+			if anParameters.GUAMI == nil {
+				radiusLog.Debug("\tGUAMI: nil")
+			} else {
+				radiusLog.Debugf("\tGUAMI: PLMNIdentity[% x], "+
+					"AMFRegionID[% x], AMFSetID[% x], AMFPointer[% x]",
+					anParameters.GUAMI.PLMNIdentity, anParameters.GUAMI.AMFRegionID,
+					anParameters.GUAMI.AMFSetID, anParameters.GUAMI.AMFPointer)
+			}
+			if anParameters.SelectedPLMNID == nil {
+				radiusLog.Debug("\tSelectedPLMNID: nil")
+			} else {
+				radiusLog.Debugf("\tSelectedPLMNID: % v", anParameters.SelectedPLMNID.Value)
+			}
+			if anParameters.RequestedNSSAI == nil {
+				radiusLog.Debug("\tRequestedNSSAI: nil")
+			} else {
+				radiusLog.Debugf("\tRequestedNSSAI:")
+				for i := 0; i < len(anParameters.RequestedNSSAI.List); i++ {
+					radiusLog.Debugf("\tRequestedNSSAI:")
+					radiusLog.Debugf("\t\tSNSSAI %d:", i+1)
+					radiusLog.Debugf("\t\t\tSST: % x", anParameters.RequestedNSSAI.List[i].SNSSAI.SST.Value)
+					sd := anParameters.RequestedNSSAI.List[i].SNSSAI.SD
+					if sd == nil {
+						radiusLog.Debugf("\t\t\tSD: nil")
+					} else {
+						radiusLog.Debugf("\t\t\tSD: % x", sd.Value)
+					}
+				}
+			}
+			if anParameters.UEIdentity == nil {
+				radiusLog.Debug("\tUEIdentity: nil")
+			} else {
+				radiusLog.Debugf("\tUEIdentity %v", anParameters.UEIdentity)
 			}
 
-			if eapExpanded.VendorID != radius_message.VendorID3GPP {
-				radiusLog.Error("The peer sent EAP expended packet with wrong vendor ID. Drop the packet.")
-				return
-			}
-			if eapExpanded.VendorType != radius_message.VendorTypeEAP5G {
-				radiusLog.Error("The peer sent EAP expanded packet with wrong vendor type. Drop the packet.")
-				return
-			}
+			// AMF selection
+			selectedAMF := tngfSelf.AMFSelection(anParameters.GUAMI, anParameters.SelectedPLMNID)
+			if selectedAMF == nil {
+				radiusLog.Warn("No avalible AMF for this UE")
 
-			eap5GMessageID, anParameters, nasPDU, unmarshal_err := UnmarshalEAP5GData(eapExpanded.VendorData)
-			if unmarshal_err != nil {
-				radiusLog.Errorf("Unmarshalling EAP-5G packet failed: %+v", unmarshal_err)
-				return
-			}
-
-			if eap5GMessageID == radius_message.EAP5GType5GStop {
 				// Send EAP failure
 				// Build Radius message
 				responseRadiusMessage.BuildRadiusHeader(radius_message.AccessChallenge, message.PktID, message.Auth)
@@ -181,7 +259,6 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 					tmpResponseRadiusPayload := responseRadiusPayload
 					tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
-
 					tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
 
 					payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
@@ -193,131 +270,50 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 				SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
 				return
 			}
+			radiusLog.Infof("Selected AMF Name: %s", selectedAMF.AMFName.Value)
 
-			// Send Initial UE Message or Uplink NAS Transport
-			if session.ThisUE == nil { // if anParameters != nil {
-				// print AN parameters
-				radiusLog.Debug("Select AMF with the following AN parameters:")
-				if anParameters.GUAMI == nil {
-					radiusLog.Debug("\tGUAMI: nil")
-				} else {
-					radiusLog.Debugf("\tGUAMI: PLMNIdentity[% x], "+
-						"AMFRegionID[% x], AMFSetID[% x], AMFPointer[% x]",
-						anParameters.GUAMI.PLMNIdentity, anParameters.GUAMI.AMFRegionID,
-						anParameters.GUAMI.AMFSetID, anParameters.GUAMI.AMFPointer)
-				}
-				if anParameters.SelectedPLMNID == nil {
-					radiusLog.Debug("\tSelectedPLMNID: nil")
-				} else {
-					radiusLog.Debugf("\tSelectedPLMNID: % v", anParameters.SelectedPLMNID.Value)
-				}
-				if anParameters.RequestedNSSAI == nil {
-					radiusLog.Debug("\tRequestedNSSAI: nil")
-				} else {
-					radiusLog.Debugf("\tRequestedNSSAI:")
-					for i := 0; i < len(anParameters.RequestedNSSAI.List); i++ {
-						radiusLog.Debugf("\tRequestedNSSAI:")
-						radiusLog.Debugf("\t\tSNSSAI %d:", i+1)
-						radiusLog.Debugf("\t\t\tSST: % x", anParameters.RequestedNSSAI.List[i].SNSSAI.SST.Value)
-						sd := anParameters.RequestedNSSAI.List[i].SNSSAI.SD
-						if sd == nil {
-							radiusLog.Debugf("\t\t\tSD: nil")
-						} else {
-							radiusLog.Debugf("\t\t\tSD: % x", sd.Value)
-						}
-					}
-				}
-				if anParameters.UEIdentity == nil {
-					radiusLog.Debug("\tUEIdentity: nil")
-				} else {
-					radiusLog.Debugf("\tUEIdentity %v", anParameters.UEIdentity)
-				}
+			// Create UE context
+			ue := tngfSelf.NewTngfUe()
 
-				// AMF selection
-				selectedAMF := tngfSelf.AMFSelection(anParameters.GUAMI, anParameters.SelectedPLMNID)
-				if selectedAMF == nil {
-					radiusLog.Warn("No avalible AMF for this UE")
+			// Relative context
+			session.ThisUE = ue
+			session.Auth = message.Auth
+			session.PktId = message.PktID
+			ue.RadiusSession = session
+			ue.AMF = selectedAMF
+			ue.UEIdentity = anParameters.UEIdentity
 
-					// Send EAP failure
-					// Build Radius message
-					responseRadiusMessage.BuildRadiusHeader(radius_message.AccessChallenge, message.PktID, message.Auth)
-					responseRadiusMessage.Payloads.Reset()
-
-					// EAP
-					identifier, random_err := GenerateRandomUint8()
-					if random_err != nil {
-						radiusLog.Errorf("Generate random uint8 failed: %+v", random_err)
-						return
-					}
-					responseRadiusPayload.BuildEAPfailure(identifier)
-
-					if requestMessageAuthenticator != nil {
-						tmpRadiusMessage := *responseRadiusMessage
-						payload := new(radius_message.RadiusPayload)
-						payload.Type = radius_message.TypeMessageAuthenticator
-						payload.Length = uint8(18)
-						payload.Val = make([]byte, 16)
-
-						tmpResponseRadiusPayload := responseRadiusPayload
-						tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
-						tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
-
-						payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
-						responseRadiusPayload = append(responseRadiusPayload, *payload)
-					}
-					responseRadiusMessage.Payloads = responseRadiusPayload
-
-					// Send Radius message to UE
-					SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
-					return
-				}
-				radiusLog.Infof("Selected AMF Name: %s", selectedAMF.AMFName.Value)
-
-				// Create UE context
-				ue := tngfSelf.NewTngfUe()
-
-				// Relative context
-				session.ThisUE = ue
-				session.Auth = message.Auth
-				session.PktId = message.PktID
-				ue.RadiusSession = session
-				ue.AMF = selectedAMF
-				ue.UEIdentity = anParameters.UEIdentity
-
-				ue.RadiusConnection = &context.UDPSocketInfo{
-					Conn:     udpConn,
-					TNGFAddr: tngfAddr,
-					UEAddr:   ueAddr,
-				}
-
-				// Store some information in conext
-				ue.IPAddrv4 = ueAddr.IP.To4().String()
-				ue.PortNumber = int32(ueAddr.Port)
-				if anParameters.EstablishmentCause != nil {
-					ue.RRCEstablishmentCause = int16(anParameters.EstablishmentCause.Value)
-				}
-				ue.TNAPID = tnapId
-				ue.UserName = userName
-
-				// Send Initial UE Message
-				ngap_message.SendInitialUEMessage(selectedAMF, ue, nasPDU)
-			} else {
-				session.Auth = message.Auth
-				session.PktId = message.PktID
-				ue := session.ThisUE
-				amf := ue.AMF
-
-				ue.RadiusConnection = &context.UDPSocketInfo{
-					Conn:     udpConn,
-					TNGFAddr: tngfAddr,
-					UEAddr:   ueAddr,
-				}
-
-				// Send Uplink NAS Transport
-				ngap_message.SendUplinkNASTransport(amf, ue, nasPDU)
+			ue.RadiusConnection = &context.UDPSocketInfo{
+				Conn:     udpConn,
+				TNGFAddr: tngfAddr,
+				UEAddr:   ueAddr,
 			}
+
+			// Store some information in conext
+			ue.IPAddrv4 = ueAddr.IP.To4().String()
+			ue.PortNumber = int32(ueAddr.Port)
+			if anParameters.EstablishmentCause != nil {
+				ue.RRCEstablishmentCause = int16(anParameters.EstablishmentCause.Value)
+			}
+			ue.TNAPID = tnapId
+			ue.UserName = userName
+
+			// Send Initial UE Message
+			ngap_message.SendInitialUEMessage(selectedAMF, ue, nasPDU)
 		} else {
-			radiusLog.Error("EAP is nil")
+			session.Auth = message.Auth
+			session.PktId = message.PktID
+			ue := session.ThisUE
+			amf := ue.AMF
+
+			ue.RadiusConnection = &context.UDPSocketInfo{
+				Conn:     udpConn,
+				TNGFAddr: tngfAddr,
+				UEAddr:   ueAddr,
+			}
+
+			// Send Uplink NAS Transport
+			ngap_message.SendUplinkNASTransport(amf, ue, nasPDU)
 		}
 
 	case InitialContextSetup:
