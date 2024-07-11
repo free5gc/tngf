@@ -125,6 +125,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		err = eap.Unmarshal(eapMessage)
 		if err != nil {
 			radiusLog.Errorf("[EAP] EAP5GNAS unmarshal error: %+v", err)
+			return
 		}
 		if eap.Code != radius_message.EAPCodeResponse {
 			radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
@@ -194,7 +195,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		}
 
 		// Send Initial UE Message or Uplink NAS Transport
-		if session.ThisUE == nil { // if anParameters != nil {
+		if session.ThisUE == nil {
 			// print AN parameters
 			radiusLog.Debug("Select AMF with the following AN parameters:")
 			if anParameters.GUAMI == nil {
