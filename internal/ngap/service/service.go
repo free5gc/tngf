@@ -118,7 +118,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		n, sctp_info, _, sctpread_err := conn.SCTPRead(data)
 
 		if sctpread_err != nil {
-			ngapLog.Debugf("[SCTP] AMF SCTP address: %+v", conn.RemoteAddr().String())
+			ngapLog.Debugf("[SCTP] AMF SCTP address: %s", remoteAddr.String())
 			if sctpread_err == io.EOF || sctpread_err == io.ErrUnexpectedEOF {
 				ngapLog.Warn("[SCTP] Close connection.")
 				errConn := conn.Close()
