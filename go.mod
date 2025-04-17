@@ -4,9 +4,9 @@ go 1.21
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/free5gc/aper v1.0.5
-	github.com/free5gc/nas v1.0.7
-	github.com/free5gc/ngap v1.0.9-0.20240414165820-453b0aa37228
+	github.com/free5gc/aper v1.0.6-0.20250102035630-3ddc831eed6a
+	github.com/free5gc/nas v1.1.5
+	github.com/free5gc/ngap v1.0.10
 	github.com/free5gc/sctp v1.0.1
 	github.com/free5gc/util v1.0.7-0.20240423011541-6c6d53b385d5
 	github.com/sirupsen/logrus v1.9.3
@@ -19,11 +19,10 @@ require (
 )
 
 require (
-	github.com/antonfisher/nested-logrus-formatter v1.3.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/free5gc/openapi v1.0.9-0.20250102055216-bb5814d1e736 // indirect
+	github.com/free5gc/openapi v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.9.1 // indirect
