@@ -1540,10 +1540,8 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 				proposal := requestSA.Proposals.BuildProposal(1, ike_message.TypeESP, spiByte)
 
 				// Encryption transform
-				var attributeType uint16 = ike_message.AttributeTypeKeyLength
-				var attributeValue uint16 = 128
 				proposal.EncryptionAlgorithm.BuildTransform(
-					ike_message.TypeEncryptionAlgorithm, ike_message.ENCR_AES_CBC, &attributeType, &attributeValue, nil)
+					ike_message.TypeEncryptionAlgorithm, ike_message.ENCR_NULL, nil, nil, nil)
 				// Integrity transform
 				if pduSession.SecurityIntegrity {
 					proposal.IntegrityAlgorithm.BuildTransform(
