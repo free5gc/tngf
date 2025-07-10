@@ -10,7 +10,7 @@ require (
 	github.com/free5gc/sctp v1.0.1
 	github.com/free5gc/util v1.0.7-0.20240423011541-6c6d53b385d5
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli v1.22.5
+	github.com/urfave/cli/v2 v2.27.7
 	github.com/vishvananda/netlink v1.1.0
 	github.com/wmnsk/go-gtp v0.8.0
 	golang.org/x/net v0.33.0
@@ -21,7 +21,7 @@ require (
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/free5gc/openapi v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
@@ -47,6 +47,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
