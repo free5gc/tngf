@@ -69,7 +69,7 @@ func (radiusMessage *RadiusMessage) Decode(rawData []byte) error {
 
 	// bounds checking
 	if len(rawData) < 20 {
-		return errors.New("Decode(): Received broken Radius header")
+		return errors.New("decode(): Received broken Radius header")
 	}
 
 	radiusMessage.Code = rawData[0]
@@ -115,7 +115,7 @@ func (container *RadiusPayloadContainer) Decode(rawData []byte) error {
 		// bounds checking
 		radiusLog.Trace("DecodePayload(): Decode 1 payload")
 		if len(rawData) <= 2 {
-			return errors.New("DecodePayload(): No sufficient bytes to decode next payload")
+			return errors.New("decodePayload(): No sufficient bytes to decode next payload")
 		}
 		payloadType := rawData[0]
 		payloadLength := rawData[1]
@@ -125,7 +125,7 @@ func (container *RadiusPayloadContainer) Decode(rawData []byte) error {
 			return fmt.Errorf("DecodePayload(): Illegal payload length %d < header length 4", payloadLength)
 		}
 		if len(rawData) < int(payloadLength) {
-			return errors.New("DecodePayload(): The length of received message not matchs the length specified in header")
+			return errors.New("decodePayload(): The length of received message not matchs the length specified in header")
 		}
 
 		var payload RadiusPayload

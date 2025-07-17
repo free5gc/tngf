@@ -39,7 +39,7 @@ func CheckConfigVersion() error {
 	currentVersion := TngfConfig.GetVersion()
 
 	if currentVersion != TngfExpectedConfigVersion {
-		return fmt.Errorf("config version is [%s], but expected is [%s].",
+		return fmt.Errorf("config version is [%s], but expected is [%s]",
 			currentVersion, TngfExpectedConfigVersion)
 	}
 

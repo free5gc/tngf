@@ -181,7 +181,7 @@ func (context *TNGFContext) AMFReInitAvailableListStore(sctpAddr string, flag bo
 func (context *TNGFContext) NewIKESecurityAssociation() *IKESecurityAssociation {
 	ikeSecurityAssociation := new(IKESecurityAssociation)
 
-	var maxSPI *big.Int = new(big.Int).SetUint64(math.MaxUint64)
+	maxSPI := new(big.Int).SetUint64(math.MaxUint64)
 	var localSPIuint64 uint64
 
 	for {
@@ -364,5 +364,5 @@ func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Cannot find interface name")
+	return "", fmt.Errorf("cannot find interface name")
 }
