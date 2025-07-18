@@ -34,7 +34,7 @@ func SetupGTPTunnelWithUPF(upfIPAddr string) (*gtp.UPlaneConn, net.Addr, error) 
 	remoteUDPAddr, err := net.ResolveUDPAddr("udp", upfUDPAddr)
 	if err != nil {
 		gtpLog.Errorf("Resolve UDP address %s failed: %+v", upfUDPAddr, err)
-		return nil, nil, errors.New("Resolve Address Failed")
+		return nil, nil, errors.New("resolve Address Failed")
 	}
 
 	tngfUDPAddr := tngfSelf.GTPBindAddress + gtp.GTPUPort
@@ -42,14 +42,14 @@ func SetupGTPTunnelWithUPF(upfIPAddr string) (*gtp.UPlaneConn, net.Addr, error) 
 	localUDPAddr, err := net.ResolveUDPAddr("udp", tngfUDPAddr)
 	if err != nil {
 		gtpLog.Errorf("Resolve UDP address %s failed: %+v", tngfUDPAddr, err)
-		return nil, nil, errors.New("Resolve Address Failed")
+		return nil, nil, errors.New("resolve Address Failed")
 	}
 
 	// Dial to UPF
 	userPlaneConnection, err := gtp.DialUPlane(gtpContext, localUDPAddr, remoteUDPAddr)
 	if err != nil {
 		gtpLog.Errorf("Dial to UPF failed: %+v", err)
-		return nil, nil, errors.New("Dial failed")
+		return nil, nil, errors.New("dial failed")
 	}
 
 	// Overwrite T-PDU handler for supporting extension header containing QoS parameters

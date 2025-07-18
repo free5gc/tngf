@@ -54,7 +54,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 				// Bound checking
 				if len(anParameterField) < int(anParameterLength) {
 					radiusLog.Error("Packet contained error length of value")
-					return 0, nil, nil, errors.New("Error formatting")
+					return 0, nil, nil, errors.New("error formatting")
 				} else {
 					anParameterField = anParameterField[:anParameterLength]
 				}
@@ -77,13 +77,13 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							} else {
 								parameterValue = parameterValue[:parameterLength]
 							}
 
 							if len(parameterValue) != message.ANParametersLenGUAMI {
-								return 0, nil, nil, errors.New("Unmatched GUAMI length")
+								return 0, nil, nil, errors.New("unmatched GUAMI length")
 							}
 
 							guamiField := make([]byte, 1)
@@ -93,7 +93,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							unmarshal_err := aper.UnmarshalWithParams(guamiField, ngapGUAMI, "valueExt")
 							if unmarshal_err != nil {
 								radiusLog.Errorf("APER unmarshal with parameter failed: %+v", unmarshal_err)
-								return 0, nil, nil, errors.New("Unmarshal failed when decoding GUAMI")
+								return 0, nil, nil, errors.New("unmarshal failed when decoding GUAMI")
 							}
 							anParameters.GUAMI = ngapGUAMI
 							radiusLog.Debugf("Unmarshal GUAMI: % x", guamiField)
@@ -111,13 +111,13 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							} else {
 								parameterValue = parameterValue[:parameterLength]
 							}
 
 							if len(parameterValue) != message.ANParametersLenPLMNID {
-								return 0, nil, nil, errors.New("Unmatched PLMN ID length")
+								return 0, nil, nil, errors.New("unmatched PLMN ID length")
 							}
 
 							plmnField := make([]byte, 1)
@@ -127,7 +127,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							unmarshal_err := aper.UnmarshalWithParams(plmnField, ngapPLMN, "valueExt")
 							if unmarshal_err != nil {
 								radiusLog.Errorf("APER unmarshal with parameter failed: %v", unmarshal_err)
-								return 0, nil, nil, errors.New("Unmarshal failed when decoding PLMN")
+								return 0, nil, nil, errors.New("unmarshal failed when decoding PLMN")
 							}
 							anParameters.SelectedPLMNID = ngapPLMN
 							radiusLog.Debugf("Unmarshal SelectedPLMNID: % x", plmnField)
@@ -142,7 +142,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							} else {
 								parameterValue = parameterValue[:parameterLength]
 							}
@@ -160,7 +160,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 
 								if len(snssaiValue) < int(snssaiLength) {
 									radiusLog.Error("SNSSAI length error")
-									return 0, nil, nil, errors.New("Error formatting")
+									return 0, nil, nil, errors.New("error formatting")
 								} else {
 									snssaiValue = snssaiValue[:snssaiLength]
 								}
@@ -184,7 +184,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 									}
 								} else {
 									radiusLog.Error("Empty SNSSAI value")
-									return 0, nil, nil, errors.New("Error formatting")
+									return 0, nil, nil, errors.New("error formatting")
 								}
 
 								ngapNSSAI.List = append(ngapNSSAI.List, ngapSNSSAIItem)
@@ -212,13 +212,13 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							} else {
 								parameterValue = parameterValue[:parameterLength]
 							}
 
 							if len(parameterValue) != message.ANParametersLenEstCause {
-								return 0, nil, nil, errors.New("Unmatched Establishment Cause length")
+								return 0, nil, nil, errors.New("unmatched Establishment Cause length")
 							}
 
 							radiusLog.Debugf("Unmarshal ANParametersTypeEstablishmentCause: % x", parameterValue)
@@ -256,7 +256,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							}
 						} else {
 							radiusLog.Warn("AN-Parameter selected NID field empty")
@@ -268,7 +268,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
-								return 0, nil, nil, errors.New("Error formatting")
+								return 0, nil, nil, errors.New("error formatting")
 							} else {
 								parameterValue = parameterValue[:parameterLength]
 							}
@@ -299,7 +299,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 			codedData = codedData[2+anParameterLength:]
 		} else {
 			radiusLog.Error("No AN-Parameter type or length specified")
-			return 0, nil, nil, errors.New("Error formatting")
+			return 0, nil, nil, errors.New("error formatting")
 		}
 
 		if len(codedData) >= 2 {
@@ -312,7 +312,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 
 				// Bound checking
 				if len(nasPDUField) < int(nasPDULength) {
-					return 0, nil, nil, errors.New("Error formatting")
+					return 0, nil, nil, errors.New("error formatting")
 				} else {
 					nasPDUField = nasPDUField[:nasPDULength]
 				}
@@ -322,15 +322,15 @@ func UnmarshalEAP5GData(codedData []byte) (
 				nasPDU = append(nasPDU, nasPDUField...)
 			} else {
 				radiusLog.Error("No NAS PDU included in EAP-5G packet")
-				return 0, nil, nil, errors.New("No NAS PDU")
+				return 0, nil, nil, errors.New("no NAS PDU")
 			}
 		} else {
 			radiusLog.Error("No NASPDU length specified")
-			return 0, nil, nil, errors.New("Error formatting")
+			return 0, nil, nil, errors.New("error formatting")
 		}
 
 		return eap5GMessageID, anParameters, nasPDU, nil
 	} else {
-		return 0, nil, nil, errors.New("No data to decode")
+		return 0, nil, nil, errors.New("no data to decode")
 	}
 }

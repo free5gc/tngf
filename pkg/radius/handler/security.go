@@ -19,7 +19,7 @@ func GenerateRandomUint8() (uint8, error) {
 	_, err := io.ReadFull(rand.Reader, number)
 	if err != nil {
 		radiusLog.Errorf("Read random failed: %+v", err)
-		return 0, errors.New("Read failed")
+		return 0, errors.New("read failed")
 	}
 	return number[0], nil
 }
@@ -46,11 +46,11 @@ func GetMessageAuthenticator(message *message.RadiusMessage) []byte {
 }
 
 func GenerateSalt() (uint16, error) {
-	max := big.NewInt(0xFFFF)
-	number, err := rand.Int(rand.Reader, max)
+	maxValue := big.NewInt(0xFFFF)
+	number, err := rand.Int(rand.Reader, maxValue)
 	if err != nil {
 		radiusLog.Errorf("Read random failed: %+v", err)
-		return 0, errors.New("Read failed")
+		return 0, errors.New("read failed")
 	}
 	// Set the most significant bit to (1)
 	number.Or(number, big.NewInt(0x8000))
@@ -66,7 +66,7 @@ func EncryptMppeKey(key, secret, authenticator []byte, saltVal uint16) ([]byte, 
 	plain = append(plain, key...)
 	plain = append(plain, pad...)
 
-	var first bool = true
+	first := true
 	result := []byte{}
 	salt := make([]byte, 2)
 	binary.BigEndian.PutUint16(salt, saltVal)

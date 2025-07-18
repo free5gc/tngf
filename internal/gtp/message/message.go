@@ -72,7 +72,7 @@ func (p *QoSTPDUPacket) unmarshalExtensionHeader() error {
 	}
 
 	if !p.qos {
-		return errors.New("unmarshalExtensionHeader err: no PDUSessionContainer in ExtensionHeaders.")
+		return errors.New("unmarshalExtensionHeader err: no PDUSessionContainer in ExtensionHeaders")
 	}
 
 	return nil

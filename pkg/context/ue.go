@@ -297,7 +297,7 @@ func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 	childSA, ok := ue.TemporaryExchangeMsgIDChildSAMapping[msgID]
 
 	if !ok {
-		return nil, fmt.Errorf("There's not a half child SA created by the exchange with message ID %d.", msgID)
+		return nil, fmt.Errorf("there's not a half child SA created by the exchange with message ID %d", msgID)
 	}
 
 	// Remove mapping of exchange msg ID and child SA
@@ -308,7 +308,7 @@ func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 	}
 
 	if len(chosenSecurityAssociation.Proposals) == 0 {
-		return nil, errors.New("No proposal")
+		return nil, errors.New("no proposal")
 	}
 
 	childSA.OutboundSPI = outboundSPI

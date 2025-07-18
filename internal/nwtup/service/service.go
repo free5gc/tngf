@@ -35,12 +35,12 @@ func Run() error {
 	connection, err := net.ListenPacket("ip4:gre", listenAddr)
 	if err != nil {
 		nwtupLog.Errorf("Error setting listen socket on %s: %+v", listenAddr, err)
-		return errors.New("ListenPacket failed")
+		return errors.New("listenPacket failed")
 	}
 	ipv4PacketConn := ipv4.NewPacketConn(connection)
 	if err != nil {
 		nwtupLog.Errorf("Error opening IPv4 packet connection socket on %s: %+v", listenAddr, err)
-		return errors.New("NewPacketConn failed")
+		return errors.New("newPacketConn failed")
 	}
 
 	tngfSelf.NWtIPv4PacketConn = ipv4PacketConn

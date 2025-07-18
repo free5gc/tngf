@@ -343,5 +343,5 @@ func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Cannot find interface name")
+	return "", fmt.Errorf("cannot find interface name")
 }
