@@ -33,8 +33,8 @@ type TngfApp struct {
 
 func NewApp(cfg *factory.Config) (*TngfApp, error) {
 	if !util.InitTNGFContext() {
-		logger.InitLog.Error("Initicating context failed")
-		return nil, fmt.Errorf("initicating context failed")
+		logger.InitLog.Error("Initiating context failed")
+		return nil, fmt.Errorf("initiating context failed")
 	}
 	tngf := &TngfApp{
 		cfg:     cfg,
