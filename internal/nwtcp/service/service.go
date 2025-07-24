@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -13,7 +14,7 @@ import (
 
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/internal/ngap/message"
-	"github.com/free5gc/tngf/pkg/context"
+	tngf_context "github.com/free5gc/tngf/pkg/context"
 )
 
 var nwtcpLog *logrus.Entry
@@ -24,12 +25,13 @@ func init() {
 
 // Run setup TNGF NAS for UE to forward NAS message
 // to AMF
-func Run() error {
+func Run(ctx context.Context) error {
 	// TNGF context
-	tngfSelf := context.TNGFSelf()
+	tngfSelf := tngf_context.TNGFSelf()
 	tcpAddr := fmt.Sprintf("%s:%d", tngfSelf.IPSecGatewayAddress, tngfSelf.TCPPort)
 
-	tcpListener, err := net.Listen("tcp", tcpAddr)
+	var lc net.ListenConfig
+	tcpListener, err := lc.Listen(ctx, "tcp", tcpAddr)
 	if err != nil {
 		nwtcpLog.Errorf("Listen TCP address failed: %+v", err)
 		return errors.New("listen failed")
@@ -70,7 +72,7 @@ func listenAndServe(tcpListener net.Listener) {
 
 		// Find UE context and store this connection in to it, then check if
 		// there is any cached NAS message for this UE. If yes, send to it.
-		tngfSelf := context.TNGFSelf()
+		tngfSelf := tngf_context.TNGFSelf()
 
 		ueIP := strings.Split(connection.RemoteAddr().String(), ":")[0]
 		ue, ok := tngfSelf.AllocatedUEIPAddressLoad(ueIP)
@@ -116,7 +118,7 @@ func decapNasMsgFromEnvelope(envelop []byte) []byte {
 // serveConn handle accepted TCP connection. It reads NAS packets
 // from the connection and call forward() to forward NAS messages
 // to AMF
-func serveConn(ue *context.TNGFUe, connection net.Conn) {
+func serveConn(ue *tngf_context.TNGFUe, connection net.Conn) {
 	defer func() {
 		if p := recover(); p != nil {
 			// Print stack for panic to log. Fatalf() will let program exit.
@@ -152,7 +154,7 @@ func serveConn(ue *context.TNGFUe, connection net.Conn) {
 
 // forward forwards NAS messages sent from UE to the
 // associated AMF
-func forward(ue *context.TNGFUe, packet []byte) {
+func forward(ue *tngf_context.TNGFUe, packet []byte) {
 	defer func() {
 		if p := recover(); p != nil {
 			// Print stack for panic to log. Fatalf() will let program exit.

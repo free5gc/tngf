@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"net"
 	"runtime/debug"
@@ -13,7 +14,7 @@ import (
 	"github.com/free5gc/tngf/internal/gre"
 	gtpQoSMsg "github.com/free5gc/tngf/internal/gtp/message"
 	"github.com/free5gc/tngf/internal/logger"
-	"github.com/free5gc/tngf/pkg/context"
+	tngf_context "github.com/free5gc/tngf/pkg/context"
 )
 
 var nwtupLog *logrus.Entry
@@ -25,23 +26,20 @@ func init() {
 // Run bind and listen IPv4 packet connection on TNGF NWt interface
 // with UP_IP_ADDRESS, catching GRE encapsulated packets and forward
 // to N3 interface.
-func Run() error {
+func Run(ctx context.Context) error {
 	// Local IPSec address
-	tngfSelf := context.TNGFSelf()
+	tngfSelf := tngf_context.TNGFSelf()
 	listenAddr := tngfSelf.IPSecGatewayAddress
 
 	// Setup IPv4 packet connection socket
 	// This socket will only capture GRE encapsulated packet
-	connection, err := net.ListenPacket("ip4:gre", listenAddr)
+	var lc net.ListenConfig
+	connection, err := lc.ListenPacket(ctx, "ip4:gre", listenAddr)
 	if err != nil {
 		nwtupLog.Errorf("Error setting listen socket on %s: %+v", listenAddr, err)
 		return errors.New("listenPacket failed")
 	}
 	ipv4PacketConn := ipv4.NewPacketConn(connection)
-	if err != nil {
-		nwtupLog.Errorf("Error opening IPv4 packet connection socket on %s: %+v", listenAddr, err)
-		return errors.New("newPacketConn failed")
-	}
 
 	tngfSelf.NWtIPv4PacketConn = ipv4PacketConn
 	go listenAndServe(ipv4PacketConn)
@@ -97,14 +95,14 @@ func forward(ueInnerIP string, ifIndex int, rawData []byte) {
 	}()
 
 	// Find UE information
-	self := context.TNGFSelf()
+	self := tngf_context.TNGFSelf()
 	ue, ok := self.AllocatedUEIPAddressLoad(ueInnerIP)
 	if !ok {
 		nwtupLog.Error("UE context not found")
 		return
 	}
 
-	var pduSession *context.PDUSession
+	var pduSession *tngf_context.PDUSession
 
 	for _, childSA := range ue.TNGFChildSecurityAssociation {
 		// Check which child SA the packet come from with interface index,
