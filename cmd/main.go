@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
 
 	"github.com/urfave/cli/v2"
 
@@ -52,19 +55,31 @@ func action(cliCtx *cli.Context) error {
 
 	logger.MainLog.Infoln("TNGF version: ", version.GetVersion())
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh  // Wait for interrupt signal to gracefully shutdown
+		cancel() // Notify each goroutine and wait them stopped
+	}()
+
 	cfg, err := factory.ReadConfig(cliCtx.String("config"))
 	if err != nil {
+		close(sigCh)
 		return err
 	}
 	factory.TngfConfig = cfg
 
-	tngf, err := service.NewApp(cfg)
+	tngf, err := service.NewApp(ctx, cfg, tlsKeyLogPath)
 	if err != nil {
+		close(sigCh)
 		return err
 	}
 	TNGF = tngf
 
-	tngf.Start(tlsKeyLogPath)
+	tngf.Start()
 
 	return nil
 }
