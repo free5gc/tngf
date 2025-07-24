@@ -105,6 +105,7 @@ func HandleIKESAINIT(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, messag
 						encryptionAlgorithmTransform = transform
 						break
 					}
+					ikeLog.Warn("Not supported encryption algorithm")
 				}
 				if encryptionAlgorithmTransform == nil {
 					continue
@@ -943,10 +944,8 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 				proposal := requestSA.Proposals.BuildProposal(1, ike_message.TypeESP, spiByte)
 
 				// Encryption transform
-				var attributeType uint16 = ike_message.AttributeTypeKeyLength
-				var attributeValue uint16 = 128
 				proposal.EncryptionAlgorithm.BuildTransform(ike_message.TypeEncryptionAlgorithm,
-					ike_message.ENCR_AES_CBC, &attributeType, &attributeValue, nil)
+					ike_message.ENCR_NULL, nil, nil, nil)
 				// Integrity transform
 				if pduSession.SecurityIntegrity {
 					proposal.IntegrityAlgorithm.BuildTransform(
@@ -1297,10 +1296,8 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 			proposal := requestSA.Proposals.BuildProposal(1, ike_message.TypeESP, spiByte)
 
 			// Encryption transform
-			var attributeType uint16 = ike_message.AttributeTypeKeyLength
-			var attributeValue uint16 = 128
 			proposal.EncryptionAlgorithm.BuildTransform(ike_message.TypeEncryptionAlgorithm,
-				ike_message.ENCR_AES_CBC, &attributeType, &attributeValue, nil)
+				ike_message.ENCR_NULL, nil, nil, nil)
 			// Integrity transform
 			if tmp_pduSession.SecurityIntegrity {
 				proposal.IntegrityAlgorithm.BuildTransform(ike_message.TypeIntegrityAlgorithm,
@@ -1400,7 +1397,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 		case ike_message.ENCR_DES_IV32:
 			return false
 		case ike_message.ENCR_NULL:
-			return false
+			return true
 		case ike_message.ENCR_AES_CBC:
 			if attributePresent {
 				switch attributeValue {

@@ -234,6 +234,16 @@ func EncryptMessage(key []byte, originData []byte, algorithmType uint16) ([]byte
 		cbcBlockMode.CryptBlocks(cipherText[aes.BlockSize:], originData)
 
 		return cipherText, nil
+	case message.ENCR_NULL:
+		length := len(key)
+		if length != 0 {
+			ikeLog.Warnf("Key size for the null cipher is not zero: %d.", length)
+		}
+
+		padLength := byte(0)
+		originData = append(originData, padLength)
+
+		return originData, nil
 	default:
 		ikeLog.Errorf("Unsupported encryption algorithm: %d", algorithmType)
 		return nil, errors.New("unsupported algorithm")
@@ -272,6 +282,16 @@ func DecryptMessage(key []byte, cipherText []byte, algorithmType uint16) ([]byte
 		plainText = plainText[:len(plainText)-padding]
 
 		ikeLog.Tracef("Decrypted content with out padding:\n%s", hex.Dump(plainText))
+
+		return plainText, nil
+	case message.ENCR_NULL:
+		length := len(key)
+		if length != 0 {
+			ikeLog.Warnf("Key size for the null cipher is not zero: %d.", length)
+		}
+
+		padding := int(cipherText[len(cipherText)-1]) + 1
+		plainText := cipherText[:len(cipherText)-padding]
 
 		return plainText, nil
 	default:
@@ -567,7 +587,9 @@ func DecryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation, ik
 	if len(ikeSecurityAssociation.SK_ai) == 0 {
 		return nil, errors.New("no initiator's integrity key")
 	}
-	if len(ikeSecurityAssociation.SK_ei) == 0 {
+
+	if len(ikeSecurityAssociation.SK_ei) == 0 &&
+		ikeSecurityAssociation.EncryptionAlgorithm.TransformID != message.ENCR_NULL {
 		return nil, errors.New("no initiator's encryption key")
 	}
 
@@ -649,7 +671,9 @@ func EncryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation,
 	if len(ikeSecurityAssociation.SK_ar) == 0 {
 		return errors.New("no responder's integrity key")
 	}
-	if len(ikeSecurityAssociation.SK_er) == 0 {
+
+	if len(ikeSecurityAssociation.SK_er) == 0 &&
+		ikeSecurityAssociation.EncryptionAlgorithm.TransformID != message.ENCR_NULL {
 		return errors.New("no responder's encryption key")
 	}
 
