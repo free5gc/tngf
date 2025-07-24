@@ -18,7 +18,8 @@ import (
 var conn net.Conn
 
 func init() {
-	if connTmp, err := net.Dial("udp", "127.0.0.1:500"); err != nil {
+	var dialer net.Dialer
+	if connTmp, err := dialer.Dial("udp", "127.0.0.1:500"); err != nil {
 		panic(err)
 	} else {
 		conn = connTmp
