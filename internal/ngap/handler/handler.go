@@ -18,6 +18,7 @@ import (
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 	"github.com/free5gc/tngf/pkg/radius/handler"
 	radius_message "github.com/free5gc/tngf/pkg/radius/message"
+	ngap_metrics "github.com/free5gc/util/metrics/ngap"
 )
 
 var ngapLog *logrus.Entry
@@ -34,8 +35,12 @@ func HandleNGSetupResponse(sctpAddr string, conn *sctp.SCTPConn, message *ngapTy
 	var relativeAMFCapacity *ngapType.RelativeAMFCapacity
 	var plmnSupportList *ngapType.PLMNSupportList
 	var criticalityDiagnostics *ngapType.CriticalityDiagnostics
-
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.NG_SETUP_RESPONSE, &metricStatusOk, cause)
 
 	tngfSelf := context.TNGFSelf()
 
@@ -97,7 +102,7 @@ func HandleNGSetupResponse(sctpAddr string, conn *sctp.SCTPConn, message *ngapTy
 	if len(iesCriticalityDiagnostics.List) != 0 {
 		ngapLog.Traceln("[NGAP] Sending error indication to AMF, because some mandatory IEs were not included")
 
-		cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
+		cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
 
 		procedureCode := ngapType.ProcedureCodeNGSetup
 		triggeringMessage := ngapType.TriggeringMessagePresentSuccessfulOutcome
@@ -132,6 +137,7 @@ func HandleNGSetupResponse(sctpAddr string, conn *sctp.SCTPConn, message *ngapTy
 	if criticalityDiagnostics != nil {
 		printCriticalityDiagnostics(criticalityDiagnostics)
 	}
+	metricStatusOk = true
 }
 
 func HandleNGSetupFailure(sctpAddr string, conn *sctp.SCTPConn, message *ngapType.NGAPPDU) {
@@ -140,8 +146,10 @@ func HandleNGSetupFailure(sctpAddr string, conn *sctp.SCTPConn, message *ngapTyp
 	// var cause *ngapType.Cause
 	// var timeToWait *ngapType.TimeToWait
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
-
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.NG_SETUP_FAILURE, &metricStatusOk, cause)
 
 	// tngfSelf := context.TNGFSelf()
 
@@ -236,6 +244,7 @@ func HandleNGSetupFailure(sctpAddr string, conn *sctp.SCTPConn, message *ngapTyp
 	// 	})
 	// 	return
 	// }
+	//	metricStatusOk = true
 }
 
 func HandleNGReset(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -243,8 +252,10 @@ func HandleNGReset(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 
 	// var cause *ngapType.Cause
 	// var resetType *ngapType.ResetType
-
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.NG_RESET, &metricStatusOk, cause)
 
 	// tngfSelf := context.TNGFSelf()
 
@@ -343,6 +354,8 @@ func HandleNGReset(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// default:
 	// 	ngapLog.Warnf("Invalid ResetType[%d]", resetType.Present)
 	// }
+
+	// metricStatusOk = true
 }
 
 func HandleNGResetAcknowledge(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -350,6 +363,10 @@ func HandleNGResetAcknowledge(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 
 	// var uEAssociatedLogicalNGConnectionList *ngapType.UEAssociatedLogicalNGConnectionList
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
+
+	// var syntaxCause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.NG_RESET_ACKNOWLEDGE, &metricStatusOk, syntaxCause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -401,6 +418,7 @@ func HandleNGResetAcknowledge(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// if criticalityDiagnostics != nil {
 	// 	printCriticalityDiagnostics(criticalityDiagnostics)
 	// }
+	// metricStatusOk = true
 }
 
 func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -423,6 +441,10 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NG
 	// var nasPDU *ngapType.NASPDU
 	var emergencyFallbackIndicator *ngapType.EmergencyFallbackIndicator
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	var tngfUe *context.TNGFUe
 	tngfSelf := context.TNGFSelf()
@@ -544,7 +566,7 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NG
 
 	if len(iesCriticalityDiagnostics.List) > 0 {
 		ngapLog.Traceln("[NGAP] Sending unsuccessful outcome to AMF, because some mandatory IEs were not included")
-		cause := buildCause(ngapType.CausePresentProtocol,
+		cause = buildCause(ngapType.CausePresentProtocol,
 			ngapType.CauseProtocolPresentAbstractSyntaxErrorFalselyConstructedMessage)
 
 		criticalityDiagnostics := buildCriticalityDiagnostics(nil, nil, nil, &iesCriticalityDiagnostics)
@@ -587,7 +609,7 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NG
 			tngfUe.Ambr = ueAggregateMaximumBitRate
 		} else {
 			ngapLog.Errorln("IE[UEAggregateMaximumBitRate] is nil")
-			cause := buildCause(ngapType.CausePresentProtocol,
+			cause = buildCause(ngapType.CausePresentProtocol,
 				ngapType.CauseProtocolPresentAbstractSyntaxErrorFalselyConstructedMessage)
 
 			criticalityDiagnosticsIEItem := buildCriticalityDiagnosticsIEItem(ngapType.CriticalityPresentReject,
@@ -635,7 +657,7 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NG
 			if err != nil {
 				ngapLog.Errorf("Create PDU Session Error: %+v\n", err)
 
-				cause := buildCause(ngapType.CausePresentRadioNetwork,
+				cause = buildCause(ngapType.CausePresentRadioNetwork,
 					ngapType.CauseRadioNetworkPresentMultiplePDUSessionIDInstances)
 				unsuccessfulTransfer, buildErr := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if buildErr != nil {
@@ -739,6 +761,8 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapType.NG
 	// Send RADIUS message to UE
 	handler.SendRadiusMessageToUE(tngfUe.RadiusConnection.Conn, tngfUe.RadiusConnection.TNGFAddr,
 		tngfUe.RadiusConnection.UEAddr, responseRadiusMessage)
+
+	metricStatusOk = true
 }
 
 // handlePDUSessionResourceSetupRequestTransfer parse and store needed information from NGAP
@@ -759,6 +783,10 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 	var networkInstance *ngapType.NetworkInstance
 	var qosFlowSetupRequestList *ngapType.QosFlowSetupRequestList
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	for _, ie := range transfer.ProtocolIEs.List {
 		switch ie.Id.Value {
@@ -793,7 +821,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 	}
 
 	if len(iesCriticalityDiagnostics.List) > 0 {
-		cause := buildCause(ngapType.CausePresentProtocol,
+		cause = buildCause(ngapType.CausePresentProtocol,
 			ngapType.CauseProtocolPresentAbstractSyntaxErrorFalselyConstructedMessage)
 		criticalityDiagnostics := buildCriticalityDiagnostics(nil, nil, nil, &iesCriticalityDiagnostics)
 		responseTransfer, err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(
@@ -819,7 +847,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			pduSession.SecurityIntegrity = true
 		default:
 			ngapLog.Error("Unknown security integrity indication")
-			cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentSemanticError)
+			cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentSemanticError)
 			responseTransfer, err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 			if err != nil {
 				ngapLog.Errorf("Build PDUSessionResourceSetupUnsuccessfulTransfer Error: %+v\n", err)
@@ -836,7 +864,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			pduSession.SecurityCipher = true
 		default:
 			ngapLog.Error("Unknown security confidentiality indication")
-			cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentSemanticError)
+			cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentSemanticError)
 			responseTransfer, err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 			if err != nil {
 				ngapLog.Errorf("Build PDUSessionResourceSetupUnsuccessfulTransfer Error: %+v\n", err)
@@ -875,7 +903,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			upfUDPAddr, err := net.ResolveUDPAddr("udp", upfIPv4+":2152")
 			if err != nil {
 				ngapLog.Errorf("Resolve UDP address failed: %+v", err)
-				cause := buildCause(ngapType.CausePresentTransport,
+				cause = buildCause(ngapType.CausePresentTransport,
 					ngapType.CauseTransportPresentTransportResourceUnavailable)
 				responseTransfer, pdu_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if pdu_err != nil {
@@ -888,7 +916,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			ueTEID := tngfSelf.NewTEID(ue)
 			if ueTEID == 0 {
 				ngapLog.Error("Invalid TEID (0).")
-				cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentUnspecified)
+				cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentUnspecified)
 				responseTransfer, pdu_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if pdu_err != nil {
 					ngapLog.Errorf("Build PDUSessionResourceSetupUnsuccessfulTransfer Error: %+v\n", pdu_err)
@@ -905,7 +933,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			gtp_userPlaneConnection, upfUDPAddr, gtp_err := gtp_service.SetupGTPTunnelWithUPF(upfIPv4)
 			if gtp_err != nil {
 				ngapLog.Errorf("Setup GTP connection with UPF failed: %+v", gtp_err)
-				cause := buildCause(ngapType.CausePresentTransport,
+				cause = buildCause(ngapType.CausePresentTransport,
 					ngapType.CauseTransportPresentTransportResourceUnavailable)
 				responseTransfer, err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if err != nil {
@@ -918,7 +946,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			ueTEID := tngfSelf.NewTEID(ue)
 			if ueTEID == 0 {
 				ngapLog.Error("Invalid TEID (0).")
-				cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentUnspecified)
+				cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentUnspecified)
 				responseTransfer, pdu_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if pdu_err != nil {
 					ngapLog.Errorf("Build PDUSessionResourceSetupUnsuccessfulTransfer Error: %+v\n", pdu_err)
@@ -938,7 +966,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 		pduSession.GTPConnection = gtpConnection
 	} else {
 		ngapLog.Error("Cannot parse \"PDU session resource setup request transfer\" message \"UL NG-U UP TNL Information\"")
-		cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
+		cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
 		responseTransfer, err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 		if err != nil {
 			ngapLog.Errorf("Build PDUSessionResourceSetupUnsuccessfulTransfer Error: %+v\n", err)
@@ -946,6 +974,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 		return false, responseTransfer
 	}
 
+	metricStatusOk = true
 	return true, nil
 }
 
@@ -965,6 +994,10 @@ func HandleUEContextModificationRequest(amf *context.TNGFAMF, message *ngapType.
 	// var securityKey *ngapType.SecurityKey
 	// var indexToRFSP *ngapType.IndexToRFSP
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// var tngfUe *context.TNGFUe
 	// tngfSelf := context.TNGFSelf()
@@ -1078,6 +1111,7 @@ func HandleUEContextModificationRequest(amf *context.TNGFAMF, message *ngapType.
 	// }
 
 	// ngap_message.SendUEContextModificationResponse(amf, tngfUe, nil)
+	// metricStatusOk = true
 }
 
 func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -1091,6 +1125,9 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 	// var ueNgapIDs *ngapType.UENGAPIDs
 	// var cause *ngapType.Cause
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// var tngfUe *context.TNGFUe
 	// tngfSelf := context.TNGFSelf()
@@ -1162,6 +1199,7 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 	// tngfUe.Remove()
 
 	// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+	// metricStatusOk := true
 }
 
 func encapNasMsgToEnvelope(nasPDU *ngapType.NASPDU) []byte {
@@ -1192,6 +1230,10 @@ func HandleDownlinkNASTransport(amf *context.TNGFAMF, message *ngapType.NGAPPDU)
 	var ueAggregateMaximumBitRate *ngapType.UEAggregateMaximumBitRate
 	var allowedNSSAI *ngapType.AllowedNSSAI
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	var tngfUe *context.TNGFUe
 
@@ -1338,6 +1380,7 @@ func HandleDownlinkNASTransport(amf *context.TNGFAMF, message *ngapType.NGAPPDU)
 			tngfUe.TemporaryCachedNASMessage = nasEnv
 		}
 	}
+	metricStatusOk = true
 }
 
 func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -1354,6 +1397,10 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 	var pduSessionResourceSetupListSUReq *ngapType.PDUSessionResourceSetupListSUReq
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 	var pduSessionEstablishmentAccept *ngapType.NASPDU
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	var tngfUe *context.TNGFUe
 
@@ -1481,7 +1528,7 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 			if err != nil {
 				ngapLog.Errorf("Create PDU Session Error: %+v\n", err)
 
-				cause := buildCause(ngapType.CausePresentRadioNetwork,
+				cause = buildCause(ngapType.CausePresentRadioNetwork,
 					ngapType.CauseRadioNetworkPresentMultiplePDUSessionIDInstances)
 				unsuccessfulTransfer, buildErr := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 				if buildErr != nil {
@@ -1595,7 +1642,7 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 					ngapLog.Errorf("Encrypting IKE message failed: %+v", err)
 					tngfUe.TemporaryPDUSessionSetupData.UnactivatedPDUSession = tngfUe.
 						TemporaryPDUSessionSetupData.UnactivatedPDUSession[1:]
-					cause := buildCause(ngapType.CausePresentTransport,
+					cause = buildCause(ngapType.CausePresentTransport,
 						ngapType.CauseTransportPresentTransportResourceUnavailable)
 					transfer, pdu_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(*cause, nil)
 					if pdu_err != nil {
@@ -1627,6 +1674,7 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 		// Cache the pduSessionEstablishmentAccept and forward to the UE after all CREATE_CHILD_SAs finish
 		tngfUe.TemporaryCachedNASMessage = nasEnv
 	}
+	metricStatusOk = true
 }
 
 func HandlePDUSessionResourceModifyRequest(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -1641,6 +1689,10 @@ func HandlePDUSessionResourceModifyRequest(amf *context.TNGFAMF, message *ngapTy
 	// var ranUeNgapID *ngapType.RANUENGAPID
 	// var pduSessionResourceModifyListModReq *ngapType.PDUSessionResourceModifyListModReq
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+	//
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// var tngfUe *context.TNGFUe
 	// tngfSelf := context.TNGFSelf()
@@ -1736,7 +1788,7 @@ func HandlePDUSessionResourceModifyRequest(amf *context.TNGFAMF, message *ngapTy
 	// 		if pduSession = tngfUe.FindPDUSession(pduSessionID); pduSession == nil {
 	// 			ngapLog.Errorf("[PDUSessionID: %d] Unknown PDU session ID", pduSessionID)
 
-	// 			cause := buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownPDUSessionID)
+	// 			cause = buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownPDUSessionID)
 	// 			unsuccessfulTransfer, buildErr := ngap_message.BuildPDUSessionResourceModifyUnsuccessfulTransfer(*cause, nil)
 	// 			if buildErr != nil {
 	// 				ngapLog.Errorf("Build PDUSessionResourceModifyUnsuccessfulTransfer Error: %+v\n", buildErr)
@@ -1756,6 +1808,7 @@ func HandlePDUSessionResourceModifyRequest(amf *context.TNGFAMF, message *ngapTy
 	// }
 
 	// ngap_message.SendPDUSessionResourceModifyResponse(amf, tngfUe, responseList, failedListModRes, nil)
+	// metricStatusOk = true
 }
 
 // temporarily unused function
@@ -1780,6 +1833,10 @@ func handlePDUSessionResourceModifyRequestTransfer(
 	// var resULNGUUPTNLInfo *ngapType.UPTransportLayerInformation
 	// var resQosFlowAddOrModifyRequestList ngapType.QosFlowAddOrModifyResponseList
 	// var resQosFlowFailedToAddOrModifyList ngapType.QosFlowListWithCause
+
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// for _, ie := range transfer.ProtocolIEs.List {
 	// 	switch ie.Id.Value {
@@ -1824,7 +1881,7 @@ func handlePDUSessionResourceModifyRequestTransfer(
 
 	// if len(iesCriticalityDiagnostics.List) != 0 {
 	// 	// build unsuccessful transfer
-	// 	cause := buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
+	// 	cause = buildCause(ngapType.CausePresentProtocol, ngapType.CauseProtocolPresentAbstractSyntaxErrorReject)
 	// 	criticalityDiagnostics := buildCriticalityDiagnostics(nil, nil, nil, &iesCriticalityDiagnostics)
 	// 	unsuccessfulTransfer, err :=
 	// 		ngap_message.BuildPDUSessionResourceModifyUnsuccessfulTransfer(*cause, &criticalityDiagnostics)
@@ -1863,7 +1920,7 @@ func handlePDUSessionResourceModifyRequestTransfer(
 	// 		} else {
 	// 			ngapLog.Errorf("Requested Qos flow not found, QosFlowID: %d", updateItem.QosFlowIdentifier)
 
-	// 			cause := buildCause(
+	// 			cause = buildCause(
 	// 				ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnkownQosFlowID)
 
 	// 			item := ngapType.QosFlowWithCauseItem{
@@ -1910,6 +1967,7 @@ func handlePDUSessionResourceModifyRequestTransfer(
 
 	// success = true
 	// responseTransfer = encodeData
+	// metricStatusOk = true
 
 	return success, responseTransfer
 }
@@ -1922,8 +1980,11 @@ func HandlePDUSessionResourceModifyConfirm(amf *context.TNGFAMF, message *ngapTy
 	// var pDUSessionResourceModifyListModCfm *ngapType.PDUSessionResourceModifyListModCfm
 	// var pDUSessionResourceFailedToModifyListModCfm *ngapType.PDUSessionResourceFailedToModifyListModCfm
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
+	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 
-	// // var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2043,6 +2104,7 @@ func HandlePDUSessionResourceModifyConfirm(amf *context.TNGFAMF, message *ngapTy
 	// if criticalityDiagnostics != nil {
 	// 	printCriticalityDiagnostics(criticalityDiagnostics)
 	// }
+	// metricStatusOk = true
 }
 
 func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2054,6 +2116,10 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 	// var pDUSessionResourceToReleaseListRelCmd *ngapType.PDUSessionResourceToReleaseListRelCmd
 
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2129,7 +2195,7 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 	// ue, ok := tngfSelf.UePoolLoad(rANUENGAPID.Value)
 	// if !ok {
 	// 	ngapLog.Errorf("Unknown local UE NGAP ID. RanUENGAPID: %d", rANUENGAPID.Value)
-	// 	cause := buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
+	// 	cause = buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
 	// 	ngap_message.SendErrorIndication(amf, nil, nil, cause, nil)
 	// 	return
 	// }
@@ -2137,7 +2203,7 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 	// if ue.AmfUeNgapId != aMFUENGAPID.Value {
 	// 	ngapLog.Errorf("Inconsistent remote UE NGAP ID, AMFUENGAPID: %d, ue.AmfUeNgapId: %d",
 	// 		aMFUENGAPID.Value, ue.AmfUeNgapId)
-	// 	cause := buildCause(ngapType.CausePresentRadioNetwork,
+	// 	cause = buildCause(ngapType.CausePresentRadioNetwork,
 	// 		ngapType.CauseRadioNetworkPresentInconsistentRemoteUENGAPID)
 	// 	ngap_message.SendErrorIndication(amf, nil, &rANUENGAPID.Value, cause, nil)
 	// 	return
@@ -2175,6 +2241,7 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 	// // TODO: Send NAS to UE
 	// // }
 	// ngap_message.SendPDUSessionResourceReleaseResponse(amf, ue, releaseList, nil)
+	// metricStatusOk := true
 }
 
 func HandleErrorIndication(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2184,6 +2251,9 @@ func HandleErrorIndication(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// var rANUENGAPID *ngapType.RANUENGAPID
 	// var cause *ngapType.Cause
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
+
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("Corresponding AMF context not found")
@@ -2246,6 +2316,7 @@ func HandleErrorIndication(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// }
 
 	// // TODO: handle error based on cause/criticalityDiagnostics
+	// metricStatusOk = true
 }
 
 func HandleUERadioCapabilityCheckRequest(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2255,6 +2326,10 @@ func HandleUERadioCapabilityCheckRequest(amf *context.TNGFAMF, message *ngapType
 	// var uERadioCapability *ngapType.UERadioCapability
 
 	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+	//
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2318,12 +2393,13 @@ func HandleUERadioCapabilityCheckRequest(amf *context.TNGFAMF, message *ngapType
 	// ue, ok := tngfSelf.UePoolLoad(rANUENGAPID.Value)
 	// if !ok {
 	// 	ngapLog.Errorf("Unknown local UE NGAP ID. RanUENGAPID: %d", rANUENGAPID.Value)
-	// 	cause := buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
+	// 	cause = buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
 	// 	ngap_message.SendErrorIndication(amf, nil, nil, cause, nil)
 	// 	return
 	// }
 
 	// ue.RadioCapability = uERadioCapability
+	// metricStatusOk = true
 }
 
 func HandleAMFConfigurationUpdate(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2336,6 +2412,10 @@ func HandleAMFConfigurationUpdate(amf *context.TNGFAMF, message *ngapType.NGAPPD
 	// var aMFTNLAssociationToAddList *ngapType.AMFTNLAssociationToAddList
 	// var aMFTNLAssociationToRemoveList *ngapType.AMFTNLAssociationToRemoveList
 	// var aMFTNLAssociationToUpdateList *ngapType.AMFTNLAssociationToUpdateList
+
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2444,12 +2524,17 @@ func HandleAMFConfigurationUpdate(amf *context.TNGFAMF, message *ngapType.NGAPPD
 	// 	}
 	// }
 	// ngap_message.SendAMFConfigurationUpdateAcknowledge(amf, setupList, nil, nil)
+	// metricStatusOk = true
 }
 
 func HandleRANConfigurationUpdateAcknowledge(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle RAN Configuration Update Acknowledge")
 
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2484,6 +2569,7 @@ func HandleRANConfigurationUpdateAcknowledge(amf *context.TNGFAMF, message *ngap
 	// if criticalityDiagnostics != nil {
 	// 	printCriticalityDiagnostics(criticalityDiagnostics)
 	// }
+	// metricStatusOk = true
 }
 
 func HandleRANConfigurationUpdateFailure(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2492,6 +2578,9 @@ func HandleRANConfigurationUpdateFailure(amf *context.TNGFAMF, message *ngapType
 	// var cause *ngapType.Cause
 	// var timeToWait *ngapType.TimeToWait
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics
+
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// tngfSelf := context.TNGFSelf()
 
@@ -2568,26 +2657,56 @@ func HandleRANConfigurationUpdateFailure(amf *context.TNGFAMF, message *ngapType
 	// 	return
 	// }
 	// ngap_message.SendRANConfigurationUpdate(amf)
+	// metricStatusOk = true
 }
 
 func HandleDownlinkRANConfigurationTransfer(message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle Downlink RAN Configuration Transfer")
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+
+	metricStatusOk = true
 }
 
 func HandleDownlinkRANStatusTransfer(message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle Downlink RAN Status Transfer")
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+
+	metricStatusOk = true
 }
 
 func HandleAMFStatusIndication(message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle AMF Status Indication")
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+
+	metricStatusOk = true
 }
 
 func HandleLocationReportingControl(message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle Location Reporting Control")
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+
+	metricStatusOk = true
 }
 
 func HandleUETNLAReleaseRequest(message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle UE TNLA Release Request")
+
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+
+	metricStatusOk = true
 }
 
 func HandleOverloadStart(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
@@ -2596,6 +2715,10 @@ func HandleOverloadStart(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// var aMFOverloadResponse *ngapType.OverloadResponse
 	// var aMFTrafficLoadReductionIndication *ngapType.TrafficLoadReductionIndication
 	// var overloadStartNSSAIList *ngapType.OverloadStartNSSAIList
+
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2634,10 +2757,15 @@ func HandleOverloadStart(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// }
 	// // TODO: restrict rule about overload action
 	// amf.StartOverload(aMFOverloadResponse, aMFTrafficLoadReductionIndication, overloadStartNSSAIList)
+	// metricStatusOk = true
 }
 
 func HandleOverloadStop(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle Overload Stop")
+
+	// var cause *ngapType.Cause
+	// metricStatusOk := false
+	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
 	// if amf == nil {
 	// 	ngapLog.Error("AMF Context is nil")
@@ -2645,6 +2773,7 @@ func HandleOverloadStop(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	// }
 	// // TODO: remove restrict about overload action
 	// amf.StopOverload()
+	// metricStatusOk = true
 }
 
 func buildCriticalityDiagnostics(
