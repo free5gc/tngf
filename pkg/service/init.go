@@ -57,7 +57,7 @@ func NewApp(ctx context.Context, cfg *factory.Config, tlsKeyLogPath string) (*Tn
 	tngf.SetLogLevel(cfg.GetLogLevel())
 	tngf.SetReportCaller(cfg.GetLogReportCaller())
 
-	features := map[utils.MetricTypeEnabled]bool{}
+	features := map[utils.MetricTypeEnabled]bool{utils.NGAP: true}
 	customMetrics := make(map[utils.MetricTypeEnabled][]prometheus.Collector)
 	if cfg.AreMetricsEnabled() {
 		if tngf.metricsServer, err = metrics.NewServer(
