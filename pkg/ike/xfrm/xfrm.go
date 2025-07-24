@@ -116,7 +116,7 @@ func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
 	var err error
 	if err = netlink.XfrmStateAdd(xfrmState); err != nil {
 		ikeLog.Errorf("Set XFRM rules failed: %+v", err)
-		return errors.New("Set XFRM state rule failed")
+		return errors.New("set XFRM state rule failed")
 	}
 
 	// Policy
@@ -142,7 +142,7 @@ func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
 	// Commit xfrm policy to netlink
 	if err = netlink.XfrmPolicyAdd(xfrmPolicy); err != nil {
 		ikeLog.Errorf("Set XFRM rules failed: %+v", err)
-		return errors.New("Set XFRM policy rule failed")
+		return errors.New("set XFRM policy rule failed")
 	}
 
 	// Direction: this_server -> {private_network}
@@ -168,7 +168,7 @@ func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
 	// Commit xfrm state to netlink
 	if err = netlink.XfrmStateAdd(xfrmState); err != nil {
 		ikeLog.Errorf("Set XFRM rules failed: %+v", err)
-		return errors.New("Set XFRM state rule failed")
+		return errors.New("set XFRM state rule failed")
 	}
 
 	// Policy
@@ -184,7 +184,7 @@ func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
 	// Commit xfrm policy to netlink
 	if err = netlink.XfrmPolicyAdd(xfrmPolicy); err != nil {
 		ikeLog.Errorf("Set XFRM rules failed: %+v", err)
-		return errors.New("Set XFRM policy rule failed")
+		return errors.New("set XFRM policy rule failed")
 	}
 
 	printSAInfo(tngf_is_initiator, xfrmiId, childSecurityAssociation)
@@ -238,7 +238,7 @@ func SetupIPsecXfrmi(xfrmIfaceName, parentIfaceName string, xfrmIfaceId uint32,
 	)
 
 	if parent, err = netlink.LinkByName(parentIfaceName); err != nil {
-		return nil, fmt.Errorf("Cannot find parent interface %s by name: %+v", parentIfaceName, err)
+		return nil, fmt.Errorf("cannot find parent interface %s by name: %+v", parentIfaceName, err)
 	}
 
 	// ip link add <xfrmIfaceName> type xfrm dev <parent.Attrs().Name> if_id <xfrmIfaceId>

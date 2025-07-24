@@ -1194,7 +1194,8 @@ func HandleDownlinkNASTransport(amf *context.TNGFAMF, message *ngapType.NGAPPDU)
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 
 	var tngfUe *context.TNGFUe
-	var tngfSelf *context.TNGFContext = context.TNGFSelf()
+
+	tngfSelf := context.TNGFSelf()
 
 	if message == nil {
 		ngapLog.Error("NGAP Message is nil")
@@ -1355,7 +1356,8 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapTyp
 	var pduSessionEstablishmentAccept *ngapType.NASPDU
 
 	var tngfUe *context.TNGFUe
-	var tngfSelf *context.TNGFContext = context.TNGFSelf()
+
+	tngfSelf := context.TNGFSelf()
 
 	if message == nil {
 		ngapLog.Error("NGAP Message is nil")

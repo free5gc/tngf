@@ -19,7 +19,6 @@ import (
 	nwtcp_service "github.com/free5gc/tngf/internal/nwtcp/service"
 	nwtup_service "github.com/free5gc/tngf/internal/nwtup/service"
 	"github.com/free5gc/tngf/internal/util"
-	"github.com/free5gc/tngf/pkg/context"
 	tngf_context "github.com/free5gc/tngf/pkg/context"
 	"github.com/free5gc/tngf/pkg/factory"
 	ike_service "github.com/free5gc/tngf/pkg/ike/service"
@@ -34,8 +33,8 @@ type TngfApp struct {
 
 func NewApp(cfg *factory.Config) (*TngfApp, error) {
 	if !util.InitTNGFContext() {
-		logger.InitLog.Error("Initicating context failed")
-		return nil, fmt.Errorf("Initicating context failed")
+		logger.InitLog.Error("Initiating context failed")
+		return nil, fmt.Errorf("initiating context failed")
 	}
 	tngf := &TngfApp{
 		cfg:     cfg,
@@ -94,7 +93,7 @@ func (a *TngfApp) Start(tlsKeyLogPath string) {
 	logger.InitLog.Infoln("Server started")
 
 	if err := a.InitDefaultXfrmInterface(); err != nil {
-		logger.InitLog.Errorf("Initicating XFRM interface for control plane failed: %+v", err)
+		logger.InitLog.Errorf("Initiating XFRM interface for control plane failed: %+v", err)
 		return
 	}
 
@@ -165,7 +164,7 @@ func (a *TngfApp) Start(tlsKeyLogPath string) {
 }
 
 func (a *TngfApp) InitDefaultXfrmInterface() error {
-	tngfContext := context.TNGFSelf()
+	tngfContext := tngf_context.TNGFSelf()
 
 	// Setup default IPsec interface for Control Plane
 	var linkIPSec netlink.Link
@@ -198,7 +197,7 @@ func (a *TngfApp) InitDefaultXfrmInterface() error {
 }
 
 func (a *TngfApp) RemoveIPsecInterfaces() {
-	tngfSelf := context.TNGFSelf()
+	tngfSelf := tngf_context.TNGFSelf()
 	tngfSelf.XfrmIfaces.Range(
 		func(key, value interface{}) bool {
 			iface := value.(netlink.Link)

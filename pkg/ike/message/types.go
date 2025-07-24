@@ -236,11 +236,10 @@ const (
 	IPProtocolGRE  = 47
 )
 
-// Types for EAP-5G
-// Used in IKE EAP expanded for vendor ID
+// VendorID3GPP is used in IKE EAP expanded for vendor ID
 const VendorID3GPP = 10415
 
-// Used in IKE EAP expanded for vendor data
+// VendorTypeEAP5G is used in IKE EAP expanded for vendor data
 const VendorTypeEAP5G = 3
 
 // Used in EAP-5G for message ID
@@ -250,7 +249,7 @@ const (
 	EAP5GType5GStop  = 4
 )
 
-// Spare
+// EAP5GSpareValue is a spare value
 const EAP5GSpareValue = 0
 
 // 3GPP specified IKE Notify

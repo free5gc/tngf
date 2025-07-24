@@ -51,7 +51,7 @@ func (a *AMFSCTPAddresses) Validate() (bool, error) {
 
 	for _, IPAddress := range a.IPAddresses {
 		if !govalidator.IsHost(IPAddress) {
-			err := errors.New("Invalid AMFSCTPAddresses.IP: " + IPAddress + ", does not validate as IP")
+			err := errors.New("invalid AMFSCTPAddresses.IP: " + IPAddress + ", does not validate as IP")
 			errs = append(errs, err)
 		}
 	}

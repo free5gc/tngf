@@ -67,7 +67,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 			time.Sleep(1 * time.Second)
 		} else {
 			ngapLog.Debugf("[SCTP] AMF SCTP address: %+v", remoteAddr.String())
-			errChan <- errors.New("Failed to connect to AMF.")
+			errChan <- errors.New("failed to connect to AMF")
 			return
 		}
 	}
@@ -80,7 +80,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		if errConn != nil {
 			ngapLog.Errorf("conn close error in GetDefaultSentParam(): %+v", errConn)
 		}
-		errChan <- errors.New("Get socket information failed.")
+		errChan <- errors.New("get socket information failed")
 		return
 	}
 	info.PPID = lib_ngap.PPID
@@ -91,7 +91,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		if errConn != nil {
 			ngapLog.Errorf("conn close error in SetDefaultSentParam(): %+v", errConn)
 		}
-		errChan <- errors.New("Set socket parameter failed.")
+		errChan <- errors.New("set socket parameter failed")
 		return
 	}
 
@@ -103,7 +103,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		if errConn != nil {
 			ngapLog.Errorf("conn close error in SubscribeEvents(): %+v", errConn)
 		}
-		errChan <- errors.New("Subscribe SCTP event failed.")
+		errChan <- errors.New("subscribe SCTP event failed")
 		return
 	}
 

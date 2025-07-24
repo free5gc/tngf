@@ -32,7 +32,7 @@ func Run() error {
 	tcpListener, err := net.Listen("tcp", tcpAddr)
 	if err != nil {
 		nwtcpLog.Errorf("Listen TCP address failed: %+v", err)
-		return errors.New("Listen failed")
+		return errors.New("listen failed")
 	}
 
 	nwtcpLog.Tracef("Successfully listen %+v", tcpAddr)

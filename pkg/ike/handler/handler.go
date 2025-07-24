@@ -649,7 +649,7 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 
 	// Load needed information
 	thisUE := tngfSelf.UELoadbyIDi(initiatorID.IDData)
-	fmt.Println("initiatorID.IDData: ", initiatorID.IDData)
+	fmt.Println("initiatorID.IDData: ", string(initiatorID.IDData))
 	ikeSecurityAssociation.ThisUE = thisUE
 	if thisUE == nil {
 		ikeLog.Errorln("UE is nil")
@@ -738,7 +738,7 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 
 	// Parse configuration request to get if the UE has requested internal address,
 	// and prepare configuration payload to UE
-	var addrRequest bool = false
+	addrRequest := false
 
 	if configuration != nil {
 		ikeLog.Tracef("Received configuration payload with type: %d", configuration.ConfigurationType)

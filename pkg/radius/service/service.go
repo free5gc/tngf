@@ -25,7 +25,7 @@ func Run() error {
 	udpAddrPort1812, err := net.ResolveUDPAddr("udp", ip+":1812")
 	if err != nil {
 		radiusLog.Errorf("Resolve UDP address failed: %+v", err)
-		return errors.New("Radius service run failed")
+		return errors.New("radius service run failed")
 	}
 
 	// Listen and serve
@@ -34,7 +34,7 @@ func Run() error {
 	go listenAndServe(udpAddrPort1812, errChan)
 	if chan_err, ok := <-errChan; ok {
 		radiusLog.Errorln(chan_err)
-		return errors.New("Radius service run failed")
+		return errors.New("radius service run failed")
 	}
 
 	return nil
