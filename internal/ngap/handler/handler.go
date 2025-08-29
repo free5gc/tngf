@@ -2107,139 +2107,151 @@ func HandlePDUSessionResourceModifyConfirm(amf *context.TNGFAMF, message *ngapTy
 
 func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle PDU Session Resource Release Command")
-	// var aMFUENGAPID *ngapType.AMFUENGAPID
-	// var rANUENGAPID *ngapType.RANUENGAPID
-	// // var rANPagingPriority *ngapType.RANPagingPriority
-	// // var nASPDU *ngapType.NASPDU
-	// var pDUSessionResourceToReleaseListRelCmd *ngapType.PDUSessionResourceToReleaseListRelCmd
+	var aMFUENGAPID *ngapType.AMFUENGAPID
+	var rANUENGAPID *ngapType.RANUENGAPID
+	// var rANPagingPriority *ngapType.RANPagingPriority
+	// var nASPDU *ngapType.NASPDU
+	var pDUSessionResourceToReleaseListRelCmd *ngapType.PDUSessionResourceToReleaseListRelCmd
 
-	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 
-	// var cause *ngapType.Cause
-	// metricStatusOk := false
-	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+	var cause *ngapType.Cause
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
-	// if amf == nil {
-	// 	ngapLog.Error("AMF Context is nil")
-	// 	return
+	if amf == nil {
+		ngapLog.Error("AMF Context is nil")
+		return
+	}
+
+	if message == nil {
+		ngapLog.Error("NGAP Message is nil")
+		return
+	}
+
+	initiatingMessage := message.InitiatingMessage
+	if initiatingMessage == nil {
+		ngapLog.Error("Initiating Message is nil")
+		return
+	}
+
+	pDUSessionResourceReleaseCommand := initiatingMessage.Value.PDUSessionResourceReleaseCommand
+	if pDUSessionResourceReleaseCommand == nil {
+		ngapLog.Error("pDUSessionResourceReleaseCommand is nil")
+		return
+	}
+
+	for _, ie := range pDUSessionResourceReleaseCommand.ProtocolIEs.List {
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			ngapLog.Traceln("[NGAP] Decode IE AMFUENGAPID")
+			aMFUENGAPID = ie.Value.AMFUENGAPID
+			if aMFUENGAPID == nil {
+				ngapLog.Error("AMFUENGAPID is nil")
+				item := buildCriticalityDiagnosticsIEItem(
+					ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
+				iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			ngapLog.Traceln("[NGAP] Decode IE RANUENGAPID")
+			rANUENGAPID = ie.Value.RANUENGAPID
+			if rANUENGAPID == nil {
+				ngapLog.Error("RANUENGAPID is nil")
+				item := buildCriticalityDiagnosticsIEItem(
+					ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
+				iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
+			}
+		case ngapType.ProtocolIEIDRANPagingPriority:
+			ngapLog.Traceln("[NGAP] Decode IE RANPagingPriority")
+			// rANPagingPriority = ie.Value.RANPagingPriority
+		case ngapType.ProtocolIEIDNASPDU:
+			ngapLog.Traceln("[NGAP] Decode IE NASPDU")
+			// nASPDU = ie.Value.NASPDU
+		case ngapType.ProtocolIEIDPDUSessionResourceToReleaseListRelCmd:
+			ngapLog.Traceln("[NGAP] Decode IE PDUSessionResourceToReleaseListRelCmd")
+			pDUSessionResourceToReleaseListRelCmd = ie.Value.PDUSessionResourceToReleaseListRelCmd
+			if pDUSessionResourceToReleaseListRelCmd == nil {
+				ngapLog.Error("PDUSessionResourceToReleaseListRelCmd is nil")
+				item := buildCriticalityDiagnosticsIEItem(
+					ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
+				iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
+			}
+		}
+	}
+
+	if len(iesCriticalityDiagnostics.List) > 0 {
+		procudureCode := ngapType.ProcedureCodePDUSessionResourceRelease
+		trigger := ngapType.TriggeringMessagePresentInitiatingMessage
+		criticality := ngapType.CriticalityPresentReject
+		criticalityDiagnostics := buildCriticalityDiagnostics(
+			&procudureCode, &trigger, &criticality, &iesCriticalityDiagnostics)
+		ngap_message.SendErrorIndication(amf, nil, nil, nil, &criticalityDiagnostics)
+		return
+	}
+
+	tngfSelf := context.TNGFSelf()
+	ue, ok := tngfSelf.UePoolLoad(rANUENGAPID.Value)
+	if !ok {
+		ngapLog.Errorf("Unknown local UE NGAP ID. RanUENGAPID: %d", rANUENGAPID.Value)
+		cause = buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
+		ngap_message.SendErrorIndication(amf, nil, nil, cause, nil)
+		return
+	}
+
+	if ue.AmfUeNgapId != aMFUENGAPID.Value {
+		ngapLog.Errorf("Inconsistent remote UE NGAP ID, AMFUENGAPID: %d, ue.AmfUeNgapId: %d",
+			aMFUENGAPID.Value, ue.AmfUeNgapId)
+		cause = buildCause(ngapType.CausePresentRadioNetwork,
+			ngapType.CauseRadioNetworkPresentInconsistentRemoteUENGAPID)
+		ngap_message.SendErrorIndication(amf, nil, &rANUENGAPID.Value, cause, nil)
+		return
+	}
+
+	// if rANPagingPriority != nil {
+	// tngf does not support paging
 	// }
 
-	// if message == nil {
-	// 	ngapLog.Error("NGAP Message is nil")
-	// 	return
-	// }
+	releaseList := ngapType.PDUSessionResourceReleasedListRelRes{}
+    for _, item := range pDUSessionResourceToReleaseListRelCmd.List {
+        pduSessionId := item.PDUSessionID.Value
+        ngapLog.Tracef("Processing release for PDU Session Id[%d]", pduSessionId)
 
-	// initiatingMessage := message.InitiatingMessage
-	// if initiatingMessage == nil {
-	// 	ngapLog.Error("Initiating Message is nil")
-	// 	return
-	// }
+        var childSAToDelete *context.ChildSecurityAssociation = nil
 
-	// pDUSessionResourceReleaseCommand := initiatingMessage.Value.PDUSessionResourceReleaseCommand
-	// if pDUSessionResourceReleaseCommand == nil {
-	// 	ngapLog.Error("pDUSessionResourceReleaseCommand is nil")
-	// 	return
-	// }
+        for _, childSA := range ue.TNGFChildSecurityAssociation {
+            for _, id := range childSA.PDUSessionIds {
+                if id == pduSessionId {
+                    childSAToDelete = childSA
+                    break
+                }
+            }
+            if childSAToDelete != nil {
+                break
+            }
+        }
+        
+        if childSAToDelete != nil {
+            if ue.TNGFIKESecurityAssociation != nil {
+                ike_handler.SendIKEDelete(ue.TNGFIKESecurityAssociation, childSAToDelete)
+                tngfSelf.ChildSA.Delete(childSAToDelete.InboundSPI)
 
-	// for _, ie := range pDUSessionResourceReleaseCommand.ProtocolIEs.List {
-	// 	switch ie.Id.Value {
-	// 	case ngapType.ProtocolIEIDAMFUENGAPID:
-	// 		ngapLog.Traceln("[NGAP] Decode IE AMFUENGAPID")
-	// 		aMFUENGAPID = ie.Value.AMFUENGAPID
-	// 		if aMFUENGAPID == nil {
-	// 			ngapLog.Error("AMFUENGAPID is nil")
-	// 			item := buildCriticalityDiagnosticsIEItem(
-	// 				ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
-	// 			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
-	// 		}
-	// 	case ngapType.ProtocolIEIDRANUENGAPID:
-	// 		ngapLog.Traceln("[NGAP] Decode IE RANUENGAPID")
-	// 		rANUENGAPID = ie.Value.RANUENGAPID
-	// 		if rANUENGAPID == nil {
-	// 			ngapLog.Error("RANUENGAPID is nil")
-	// 			item := buildCriticalityDiagnosticsIEItem(
-	// 				ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
-	// 			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
-	// 		}
-	// 	case ngapType.ProtocolIEIDRANPagingPriority:
-	// 		ngapLog.Traceln("[NGAP] Decode IE RANPagingPriority")
-	// 		// rANPagingPriority = ie.Value.RANPagingPriority
-	// 	case ngapType.ProtocolIEIDNASPDU:
-	// 		ngapLog.Traceln("[NGAP] Decode IE NASPDU")
-	// 		// nASPDU = ie.Value.NASPDU
-	// 	case ngapType.ProtocolIEIDPDUSessionResourceToReleaseListRelCmd:
-	// 		ngapLog.Traceln("[NGAP] Decode IE PDUSessionResourceToReleaseListRelCmd")
-	// 		pDUSessionResourceToReleaseListRelCmd = ie.Value.PDUSessionResourceToReleaseListRelCmd
-	// 		if pDUSessionResourceToReleaseListRelCmd == nil {
-	// 			ngapLog.Error("PDUSessionResourceToReleaseListRelCmd is nil")
-	// 			item := buildCriticalityDiagnosticsIEItem(
-	// 				ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
-	// 			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
-	// 		}
-	// 	}
-	// }
-
-	// if len(iesCriticalityDiagnostics.List) > 0 {
-	// 	procudureCode := ngapType.ProcedureCodePDUSessionResourceRelease
-	// 	trigger := ngapType.TriggeringMessagePresentInitiatingMessage
-	// 	criticality := ngapType.CriticalityPresentReject
-	// 	criticalityDiagnostics := buildCriticalityDiagnostics(
-	// 		&procudureCode, &trigger, &criticality, &iesCriticalityDiagnostics)
-	// 	ngap_message.SendErrorIndication(amf, nil, nil, nil, &criticalityDiagnostics)
-	// 	return
-	// }
-
-	// tngfSelf := context.TNGFSelf()
-	// ue, ok := tngfSelf.UePoolLoad(rANUENGAPID.Value)
-	// if !ok {
-	// 	ngapLog.Errorf("Unknown local UE NGAP ID. RanUENGAPID: %d", rANUENGAPID.Value)
-	// 	cause = buildCause(ngapType.CausePresentRadioNetwork, ngapType.CauseRadioNetworkPresentUnknownLocalUENGAPID)
-	// 	ngap_message.SendErrorIndication(amf, nil, nil, cause, nil)
-	// 	return
-	// }
-
-	// if ue.AmfUeNgapId != aMFUENGAPID.Value {
-	// 	ngapLog.Errorf("Inconsistent remote UE NGAP ID, AMFUENGAPID: %d, ue.AmfUeNgapId: %d",
-	// 		aMFUENGAPID.Value, ue.AmfUeNgapId)
-	// 	cause = buildCause(ngapType.CausePresentRadioNetwork,
-	// 		ngapType.CauseRadioNetworkPresentInconsistentRemoteUENGAPID)
-	// 	ngap_message.SendErrorIndication(amf, nil, &rANUENGAPID.Value, cause, nil)
-	// 	return
-	// }
-
-	// // if rANPagingPriority != nil {
-	// // tngf does not support paging
-	// // }
-
-	// releaseList := ngapType.PDUSessionResourceReleasedListRelRes{}
-	// for _, item := range pDUSessionResourceToReleaseListRelCmd.List {
-	// 	pduSessionId := item.PDUSessionID.Value
-	// 	transfer := ngapType.PDUSessionResourceReleaseCommandTransfer{}
-	// 	err := aper.UnmarshalWithParams(item.PDUSessionResourceReleaseCommandTransfer, &transfer, "valueExt")
-	// 	if err != nil {
-	//		ngapLog.Warnf(
-	//			"[PDUSessionID: %d] PDUSessionResourceReleaseCommandTransfer Decode Error: %+v\n",
-	//			pduSessionId,
-	//			err)
-	// 	} else {
-	// 		printAndGetCause(&transfer.Cause)
-	// 	}
-	// 	ngapLog.Tracef("Release PDU Session Id[%d] due to PDU Session Resource Release Command", pduSessionId)
-	// 	delete(ue.PduSessionList, pduSessionId)
-
-	// 	// response list
-	// 	releaseItem := ngapType.PDUSessionResourceReleasedItemRelRes{
-	// 		PDUSessionID: item.PDUSessionID,
-	// 		PDUSessionResourceReleaseResponseTransfer: getPDUSessionResourceReleaseResponseTransfer(),
-	// 	}
-	// 	releaseList.List = append(releaseList.List, releaseItem)
-	// }
-
-	// // if nASPDU != nil {
-	// // TODO: Send NAS to UE
-	// // }
-	// ngap_message.SendPDUSessionResourceReleaseResponse(amf, ue, releaseList, nil)
-	// metricStatusOk := true
+                delete(ue.TNGFChildSecurityAssociation, childSAToDelete.InboundSPI)
+            } else {
+                 ngapLog.Error("Cannot trigger IKE DELETE: IKE SA context is missing.")
+            }
+        } else {
+            ngapLog.Warnf("No corresponding Child SA found for PDU Session ID [%d].", pduSessionId)
+        }
+        delete(ue.PduSessionList, pduSessionId)
+        
+        releaseItem := ngapType.PDUSessionResourceReleasedItemRelRes{
+            PDUSessionID: item.PDUSessionID,
+            PDUSessionResourceReleaseResponseTransfer: getPDUSessionResourceReleaseResponseTransfer(),
+        }
+        releaseList.List = append(releaseList.List, releaseItem)
+    }
+    ngap_message.SendPDUSessionResourceReleaseResponse(amf, ue, releaseList, nil)
+    metricStatusOk = true
 }
 
 func HandleErrorIndication(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {

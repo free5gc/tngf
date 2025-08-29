@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -827,6 +828,30 @@ func (del *Delete) unmarshal(rawData []byte) error {
 	}
 
 	return nil
+}
+
+func (container *IKEPayloadContainer) BuildDelete(protocolID uint8, spiSize uint8, spis []uint32) *Delete {
+	deletePayload := new(Delete)
+
+	deletePayload.ProtocolID = protocolID
+	deletePayload.SPISize = spiSize
+	deletePayload.NumberOfSPI = uint16(len(spis))
+
+	spiData := new(bytes.Buffer)
+	for _, spi := range spis {
+		if spiSize == 4 { // ESP SPI 是 4 bytes (uint32)
+			spiBytes := make([]byte, 4)
+			binary.BigEndian.PutUint32(spiBytes, spi)
+			if _, err := spiData.Write(spiBytes); err != nil {
+				ikeLog.Errorf("Write SPI to buffer failed: %+v", err)
+				return nil
+			}
+		}
+	}
+	deletePayload.SPIs = spiData.Bytes()
+
+	*container = append(*container, deletePayload)
+	return deletePayload
 }
 
 // Definition of Vendor ID

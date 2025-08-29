@@ -1374,6 +1374,82 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	}
 }
 
+// SendIKEDelete initiates an INFORMATIONAL exchange with a DELETE payload to delete a Child SA.
+func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.ChildSecurityAssociation) {
+    
+    responseIKEMessage := new(ike_message.IKEMessage)
+    
+    var responseIKEPayload ike_message.IKEPayloadContainer
+
+    
+    if ikeSA == nil || childSA == nil {
+        ikeLog.Error("SendIKEDelete failed: IKESecurityAssociation or ChildSecurityAssociation is nil")
+        return
+    }
+    
+    
+    ikeSA.InitiatorMessageID++ 
+    
+    
+    responseIKEMessage.BuildIKEHeader(ikeSA.RemoteSPI, ikeSA.LocalSPI,
+        ike_message.INFORMATIONAL, ike_message.InitiatorBitCheck, ikeSA.InitiatorMessageID)
+    
+    
+    ikeLog.Infof("Building IKE DELETE payload for Child SA with SPI [0x%x]", childSA.OutboundSPI)
+    
+    responseIKEPayload.BuildDelete(ike_message.TypeESP, 4, []uint32{childSA.OutboundSPI})
+
+    
+    if err := EncryptProcedure(ikeSA, responseIKEPayload, responseIKEMessage); err != nil {
+        ikeLog.Errorf("Encrypting IKE DELETE message failed: %+v", err)
+        return
+    }
+
+    
+    ue := ikeSA.ThisUE
+    if ue == nil || ue.IKEConnection == nil {
+        ikeLog.Error("Cannot find IKE connection info to send IKE DELETE")
+        return
+    }
+    SendIKEMessageToUE(ue.IKEConnection.Conn, ue.IKEConnection.TNGFAddr, ue.IKEConnection.UEAddr, responseIKEMessage)
+    ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for Child SA with SPI [0x%x] to UE", childSA.OutboundSPI)
+}
+
+func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message *ike_message.IKEMessage) {
+    ikeLog.Info("Handle INFORMATIONAL")
+
+    tngfSelf := context.TNGFSelf()
+    
+    localSPI := message.InitiatorSPI
+    
+    ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
+    if !ok {
+        ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: 0x%x", localSPI)
+        return
+    }
+
+    if ikeSecurityAssociation.RemoteSPI != message.ResponderSPI {
+        ikeLog.Warnf("Responder SPI [0x%x] in INFORMATIONAL response does not match stored UE SPI [0x%x]", 
+            message.ResponderSPI, ikeSecurityAssociation.RemoteSPI)
+        return
+    }
+
+    encryptedPayload := message.Payloads[0].(*ike_message.Encrypted)
+    decryptedIKEPayload, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+    if err != nil {
+        ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
+        return
+    }
+    
+    for _, p := range decryptedIKEPayload {
+        if p.Type() == ike_message.TypeD {
+            ikeLog.Info("Received Delete Payload in INFORMATIONAL response from UE. Peer SA deletion confirmed.")
+        }
+    }
+    
+    ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
+}
+
 func is_supported(transformType uint8, transformID uint16, attributePresent bool, attributeValue uint16) bool {
 	switch transformType {
 	case ike_message.TypeEncryptionAlgorithm:
