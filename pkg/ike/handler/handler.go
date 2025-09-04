@@ -1438,6 +1438,11 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		return
 	}
 
+	if (message.Flags & ike_message.ResponseBitCheck) != 0 {
+		handleInformationalResponse(ikeSecurityAssociation, message)
+		return
+	}
+
 	// RFC 7296 §2.21: every INFORMATIONAL request must receive an empty INFORMATIONAL response.
 	// Send it before processing delete payloads below, since a Delete(IKE) payload can tear down
 	// this ikeSecurityAssociation.
@@ -1511,6 +1516,41 @@ func handleInformationalDeletePayload(
 			tngfSelf.DeleteIKESecurityAssociation(ikeSecurityAssociation.LocalSPI)
 		}
 	}
+}
+
+func handleInformationalResponse(
+	ikeSecurityAssociation *context.IKESecurityAssociation,
+	message *ike_message.IKEMessage,
+) {
+	if ikeSecurityAssociation.RemoteSPI != message.InitiatorSPI {
+		ikeLog.Warnf(
+			"Initiator SPI [0x%x] in INFORMATIONAL response does not match stored UE SPI [0x%x]",
+			message.InitiatorSPI,
+			ikeSecurityAssociation.RemoteSPI,
+		)
+		return
+	}
+
+	for _, payload := range message.Payloads {
+		encryptedPayload, isEncrypted := payload.(*ike_message.Encrypted)
+		if !isEncrypted {
+			continue
+		}
+
+		decryptedPayloads, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+		if err != nil {
+			ikeLog.Errorf("Decrypt INFORMATIONAL response failed: %+v", err)
+			return
+		}
+
+		for _, decryptedPayload := range decryptedPayloads {
+			if decryptedPayload.Type() == ike_message.TypeD {
+				ikeLog.Info("Received Delete Payload in INFORMATIONAL response from UE. Peer SA deletion confirmed.")
+			}
+		}
+	}
+
+	ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
 }
 
 func is_supported(transformType uint8, transformID uint16, attributePresent bool, attributeValue uint16) bool {

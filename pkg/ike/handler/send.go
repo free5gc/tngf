@@ -182,3 +182,80 @@ func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, mes
 	markPeerRequestMessageIDProcessed(message)
 	sendIKEPacketToUE(udpConn, dstAddr, pkt)
 }
+
+// SendIKEDelete initiates an INFORMATIONAL exchange with a DELETE payload to delete a Child SA.
+func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.ChildSecurityAssociation) {
+	if ikeSA == nil || childSA == nil {
+		ikeLog.Error("SendIKEDelete failed: IKESecurityAssociation or ChildSecurityAssociation is nil")
+		return
+	}
+
+	ue := ikeSA.ThisUE.Load()
+	if ue == nil || ue.IKEConnection == nil {
+		ikeLog.Error("Cannot find IKE connection info to send IKE DELETE")
+		return
+	}
+
+	ikeSA.InitiatorMessageID++
+
+	ikeMessage := new(ike_message.IKEMessage)
+	var ikePayload ike_message.IKEPayloadContainer
+	ikeMessage.BuildIKEHeader(
+		ikeSA.RemoteSPI,
+		ikeSA.LocalSPI,
+		ike_message.INFORMATIONAL,
+		ike_message.InitiatorBitCheck,
+		ikeSA.InitiatorMessageID,
+	)
+
+	ikeLog.Infof("Building IKE DELETE payload for Child SA with SPI [0x%x]", childSA.OutboundSPI)
+	ikePayload.BuildDelete(ike_message.TypeESP, 4, []uint32{childSA.OutboundSPI})
+
+	if err := EncryptProcedure(ikeSA, ikePayload, ikeMessage); err != nil {
+		ikeLog.Errorf("Encrypting IKE DELETE message failed: %+v", err)
+		return
+	}
+
+	SendIKEMessageToUE(ue.IKEConnection.Conn, ue.IKEConnection.TNGFAddr, ue.IKEConnection.UEAddr, ikeMessage)
+	ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for Child SA with SPI [0x%x] to UE", childSA.OutboundSPI)
+}
+
+func SendIKESADeletion(ikeSA *context.IKESecurityAssociation) {
+	if ikeSA == nil {
+		ikeLog.Error("SendIKESADeletion failed: IKESecurityAssociation is nil")
+		return
+	}
+
+	ue := ikeSA.ThisUE.Load()
+	if ue == nil || ue.IKEConnection == nil {
+		ikeLog.Error("Cannot find IKE connection info to send IKE SA DELETE")
+		return
+	}
+
+	ikeSA.InitiatorMessageID++
+
+	ikeMessage := new(ike_message.IKEMessage)
+	var ikePayload ike_message.IKEPayloadContainer
+	ikeMessage.BuildIKEHeader(
+		ikeSA.RemoteSPI,
+		ikeSA.LocalSPI,
+		ike_message.INFORMATIONAL,
+		ike_message.InitiatorBitCheck,
+		ikeSA.InitiatorMessageID,
+	)
+
+	ikeLog.Infof(
+		"Building IKE DELETE payload for parent IKE SA with SPIs [Local: 0x%x, Remote: 0x%x]",
+		ikeSA.LocalSPI,
+		ikeSA.RemoteSPI,
+	)
+	ikePayload.BuildDelete(ike_message.TypeIKE, 0, nil)
+
+	if err := EncryptProcedure(ikeSA, ikePayload, ikeMessage); err != nil {
+		ikeLog.Errorf("Encrypting IKE SA DELETE message failed: %+v", err)
+		return
+	}
+
+	SendIKEMessageToUE(ue.IKEConnection.Conn, ue.IKEConnection.TNGFAddr, ue.IKEConnection.UEAddr, ikeMessage)
+	ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for IKE SA to UE")
+}
