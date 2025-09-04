@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"encoding/binary"
 	"net"
 
@@ -1117,89 +1118,121 @@ func HandleUEContextModificationRequest(amf *context.TNGFAMF, message *ngapType.
 func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
 	ngapLog.Infoln("[TNGF] Handle UE Context Release Command")
 
-	// if amf == nil {
-	// 	ngapLog.Error("Corresponding AMF context not found")
-	// 	return
-	// }
+	if amf == nil {
+		ngapLog.Error("Corresponding AMF context not found")
+		return
+	}
 
-	// var ueNgapIDs *ngapType.UENGAPIDs
-	// var cause *ngapType.Cause
-	// var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
+	var ueNgapIDs *ngapType.UENGAPIDs
+	var cause *ngapType.Cause
+	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 
-	// metricStatusOk := false
-	// defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+	metricStatusOk := false
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
 
-	// var tngfUe *context.TNGFUe
-	// tngfSelf := context.TNGFSelf()
+	var tngfUe *context.TNGFUe
+	tngfSelf := context.TNGFSelf()
 
-	// if message == nil {
-	// 	ngapLog.Error("NGAP Message is nil")
-	// 	return
-	// }
+	if message == nil {
+		ngapLog.Error("NGAP Message is nil")
+		return
+	}
 
-	// initiatingMessage := message.InitiatingMessage
-	// if initiatingMessage == nil {
-	// 	ngapLog.Error("Initiating Message is nil")
-	// 	return
-	// }
+	initiatingMessage := message.InitiatingMessage
+	if initiatingMessage == nil {
+		ngapLog.Error("Initiating Message is nil")
+		return
+	}
 
-	// ueContextReleaseCommand := initiatingMessage.Value.UEContextReleaseCommand
-	// if ueContextReleaseCommand == nil {
-	// 	ngapLog.Error("UEContextReleaseCommand is nil")
-	// 	return
-	// }
+	ueContextReleaseCommand := initiatingMessage.Value.UEContextReleaseCommand
+	if ueContextReleaseCommand == nil {
+		ngapLog.Error("UEContextReleaseCommand is nil")
+		return
+	}
 
-	// for _, ie := range ueContextReleaseCommand.ProtocolIEs.List {
-	// 	switch ie.Id.Value {
-	// 	case ngapType.ProtocolIEIDUENGAPIDs:
-	// 		ngapLog.Traceln("[NGAP] Decode IE UENGAPIDs")
-	// 		ueNgapIDs = ie.Value.UENGAPIDs
-	// 		if ueNgapIDs == nil {
-	// 			ngapLog.Errorf("UENGAPIDs is nil")
-	// 			item := buildCriticalityDiagnosticsIEItem(
-	// 				ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
-	// 			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
-	// 		}
-	// 	case ngapType.ProtocolIEIDCause:
-	// 		ngapLog.Traceln("[NGAP] Decode IE Cause")
-	// 		cause = ie.Value.Cause
-	// 	}
-	// }
+	for _, ie := range ueContextReleaseCommand.ProtocolIEs.List {
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDUENGAPIDs:
+			ngapLog.Traceln("[NGAP] Decode IE UENGAPIDs")
+			ueNgapIDs = ie.Value.UENGAPIDs
+			if ueNgapIDs == nil {
+				ngapLog.Errorf("UENGAPIDs is nil")
+				item := buildCriticalityDiagnosticsIEItem(
+					ngapType.CriticalityPresentReject, ie.Id.Value, ngapType.TypeOfErrorPresentMissing)
+				iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List, item)
+			}
+		case ngapType.ProtocolIEIDCause:
+			ngapLog.Traceln("[NGAP] Decode IE Cause")
+			cause = ie.Value.Cause
+		}
+	}
 
-	// if len(iesCriticalityDiagnostics.List) > 0 {
-	// 	// TODO: send error indication
-	// 	return
-	// }
+	if len(iesCriticalityDiagnostics.List) > 0 {
+		// TODO: send error indication
+		return
+	}
 
-	// switch ueNgapIDs.Present {
-	// case ngapType.UENGAPIDsPresentUENGAPIDPair:
-	// 	var ok bool
-	// 	tngfUe, ok = tngfSelf.UePoolLoad(ueNgapIDs.UENGAPIDPair.RANUENGAPID.Value)
-	// 	if !ok {
-	// 		tngfUe = amf.FindUeByAmfUeNgapID(ueNgapIDs.UENGAPIDPair.AMFUENGAPID.Value)
-	// 	}
-	// case ngapType.UENGAPIDsPresentAMFUENGAPID:
-	// 	// TODO: find UE according to specific AMF
-	// 	// The implementation here may have error when TNGF need to
-	// 	// connect multiple AMFs.
-	// 	// Use UEpool in AMF context can solve this problem
-	// 	tngfUe = amf.FindUeByAmfUeNgapID(ueNgapIDs.AMFUENGAPID.Value)
-	// }
+	switch ueNgapIDs.Present {
+	case ngapType.UENGAPIDsPresentUENGAPIDPair:
+		var ok bool
+		tngfUe, ok = tngfSelf.UePoolLoad(ueNgapIDs.UENGAPIDPair.RANUENGAPID.Value)
+		if !ok {
+			tngfUe = amf.FindUeByAmfUeNgapID(ueNgapIDs.UENGAPIDPair.AMFUENGAPID.Value)
+		}
+	case ngapType.UENGAPIDsPresentAMFUENGAPID:
+		// TODO: find UE according to specific AMF
+		// The implementation here may have error when TNGF need to
+		// connect multiple AMFs.
+		// Use UEpool in AMF context can solve this problem
+		tngfUe = amf.FindUeByAmfUeNgapID(ueNgapIDs.AMFUENGAPID.Value)
+	}
 
-	// if tngfUe == nil {
-	// 	// TODO: send error indication(unknown local ngap ue id)
-	// 	return
-	// }
+	if tngfUe == nil {
+		// TODO: send error indication(unknown local ngap ue id)
+		return
+	}
 
-	// if cause != nil {
-	// 	printAndGetCause(cause)
-	// }
+	if cause != nil {
+		printAndGetCause(cause)
+	}
+
+
+	// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
 
 	// // TODO: release pdu session and gtp info for ue
 	// tngfUe.Remove()
 
-	// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
-	// metricStatusOk := true
+	// Send UE Context Release Complete response to AMF
+    ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+
+    // Release resources
+    if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
+        ngapLog.Errorf("Error while releasing UE resources: %+v", err)
+    }
+
+	metricStatusOk = true
+}
+
+
+func releaseTngfUeAndIkeSa(ue *context.TNGFUe) error {
+    ngapLog.Infof("Releasing all resources for UE")
+
+    if ue == nil {
+        return errors.New("TNGFUe is nil")
+    }
+
+    if ue.TNGFIKESecurityAssociation != nil {
+        // Delete the parent IKE SA
+        ike_handler.SendIKESADeletion(ue.TNGFIKESecurityAssociation)
+    } else {
+        ngapLog.Warnf("UE[AMF_UE_NGAP_ID: %d] has no IKE Security Association to release.", ue.AmfUeNgapId)
+    }
+
+    // TNGF UE Context Removal
+    ue.Remove()
+    
+    ngapLog.Infof("Successfully released TNGF UE context for AMF_UE_NGAP_ID: %d", ue.AmfUeNgapId)
+    return nil
 }
 
 func encapNasMsgToEnvelope(nasPDU *ngapType.NASPDU) []byte {
