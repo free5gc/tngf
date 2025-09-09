@@ -90,8 +90,7 @@ func SendIKESADeletion(ikeSA *context.IKESecurityAssociation) {
         ike_message.INFORMATIONAL, ike_message.InitiatorBitCheck, ikeSA.InitiatorMessageID)
 
     // Delete IKE SA itself
-    ikeLog.Infof("Building IKE DELETE payload for parent IKE SA with SPIs [Local: 0x%x, Remote: 0x%x]",
-        ikeSA.LocalSPI, ikeSA.RemoteSPI)
+    ikeLog.Infof("Building IKE DELETE payload for parent IKE SA with SPIs")
     responseIKEPayload.BuildDelete(ike_message.TypeIKE, 0, nil) // Protocol=IKE, 0 SPIs
 
     // Encrypt the message
