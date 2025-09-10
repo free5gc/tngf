@@ -4,11 +4,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/hex"
-	"fmt"
 	"math"
 	"math/big"
 	"net"
-	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -345,24 +343,4 @@ func generateRandomIPinRange(subnet *net.IPNet) net.IP {
 	}
 
 	return net.IPv4(ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3])
-}
-
-func GetInterfaceName(ipAddress string) (interfaceName string, err error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return "nil", err
-	}
-
-	for _, inter := range interfaces {
-		addrs, addr_err := inter.Addrs()
-		if addr_err != nil {
-			return "nil", addr_err
-		}
-		for _, addr := range addrs {
-			if ipAddress == addr.String()[0:strings.Index(addr.String(), "/")] {
-				return inter.Name, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("cannot find interface name")
 }
