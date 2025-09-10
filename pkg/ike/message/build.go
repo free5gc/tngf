@@ -319,7 +319,7 @@ func (container *IKEPayloadContainer) BuildDelete(protocolID uint8, spiSize uint
 
 	spiData := new(bytes.Buffer)
 	for _, spi := range spis {
-		if spiSize == 4 { 
+		if spiSize == 4 {
 			spiBytes := make([]byte, 4)
 			binary.BigEndian.PutUint32(spiBytes, spi)
 			if _, err := spiData.Write(spiBytes); err != nil {
