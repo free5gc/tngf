@@ -1377,36 +1377,36 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message *ike_message.IKEMessage) {
 	ikeLog.Info("Handle INFORMATIONAL")
 
-    tngfSelf := context.TNGFSelf()
-    
-    localSPI := message.InitiatorSPI
-    
-    ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
-    if !ok {
-        ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: 0x%x", localSPI)
-        return
-    }
+	tngfSelf := context.TNGFSelf()
 
-    if ikeSecurityAssociation.RemoteSPI != message.ResponderSPI {
-        ikeLog.Warnf("Responder SPI [0x%x] in INFORMATIONAL response does not match stored UE SPI [0x%x]", 
-            message.ResponderSPI, ikeSecurityAssociation.RemoteSPI)
-        return
-    }
+	localSPI := message.InitiatorSPI
 
-    encryptedPayload := message.Payloads[0].(*ike_message.Encrypted)
-    decryptedIKEPayload, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
-    if err != nil {
-        ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
-        return
-    }
-    
-    for _, p := range decryptedIKEPayload {
-        if p.Type() == ike_message.TypeD {
-            ikeLog.Info("Received Delete Payload in INFORMATIONAL response from UE. Peer SA deletion confirmed.")
-        }
-    }
-    
-    ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
+	ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
+	if !ok {
+		ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: 0x%x", localSPI)
+		return
+	}
+
+	if ikeSecurityAssociation.RemoteSPI != message.ResponderSPI {
+		ikeLog.Warnf("Responder SPI [0x%x] in INFORMATIONAL response does not match stored UE SPI [0x%x]",
+			message.ResponderSPI, ikeSecurityAssociation.RemoteSPI)
+		return
+	}
+
+	encryptedPayload := message.Payloads[0].(*ike_message.Encrypted)
+	decryptedIKEPayload, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+	if err != nil {
+		ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
+		return
+	}
+
+	for _, p := range decryptedIKEPayload {
+		if p.Type() == ike_message.TypeD {
+			ikeLog.Info("Received Delete Payload in INFORMATIONAL response from UE. Peer SA deletion confirmed.")
+		}
+	}
+
+	ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
 }
 
 func is_supported(transformType uint8, transformID uint16, attributePresent bool, attributeValue uint16) bool {
