@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"encoding/binary"
+	"errors"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -1196,43 +1196,41 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 		printAndGetCause(cause)
 	}
 
-
 	// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
 
 	// // TODO: release pdu session and gtp info for ue
 	// tngfUe.Remove()
 
 	// Send UE Context Release Complete response to AMF
-    ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+	ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
 
-    // Release resources
-    if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
-        ngapLog.Errorf("Error while releasing UE resources: %+v", err)
-    }
+	// Release resources
+	if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
+		ngapLog.Errorf("Error while releasing UE resources: %+v", err)
+	}
 
 	metricStatusOk = true
 }
 
-
 func releaseTngfUeAndIkeSa(ue *context.TNGFUe) error {
-    ngapLog.Infof("Releasing all resources for UE")
+	ngapLog.Infof("Releasing all resources for UE")
 
-    if ue == nil {
-        return errors.New("TNGFUe is nil")
-    }
+	if ue == nil {
+		return errors.New("TNGFUe is nil")
+	}
 
-    if ue.TNGFIKESecurityAssociation != nil {
-        // Delete the parent IKE SA
-        ike_handler.SendIKESADeletion(ue.TNGFIKESecurityAssociation)
-    } else {
-        ngapLog.Warnf("UE[AMF_UE_NGAP_ID: %d] has no IKE Security Association to release.", ue.AmfUeNgapId)
-    }
+	if ue.TNGFIKESecurityAssociation != nil {
+		// Delete the parent IKE SA
+		ike_handler.SendIKESADeletion(ue.TNGFIKESecurityAssociation)
+	} else {
+		ngapLog.Warnf("UE[AMF_UE_NGAP_ID: %d] has no IKE Security Association to release.", ue.AmfUeNgapId)
+	}
 
-    // TNGF UE Context Removal
-    ue.Remove()
-    
-    ngapLog.Infof("Successfully released TNGF UE context for AMF_UE_NGAP_ID: %d", ue.AmfUeNgapId)
-    return nil
+	// TNGF UE Context Removal
+	ue.Remove()
+
+	ngapLog.Infof("Successfully released TNGF UE context for AMF_UE_NGAP_ID: %d", ue.AmfUeNgapId)
+	return nil
 }
 
 func encapNasMsgToEnvelope(nasPDU *ngapType.NASPDU) []byte {
@@ -2245,46 +2243,46 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 	// }
 
 	releaseList := ngapType.PDUSessionResourceReleasedListRelRes{}
-    for _, item := range pDUSessionResourceToReleaseListRelCmd.List {
-        pduSessionId := item.PDUSessionID.Value
-        ngapLog.Tracef("Processing release for PDU Session Id[%d]", pduSessionId)
+	for _, item := range pDUSessionResourceToReleaseListRelCmd.List {
+		pduSessionId := item.PDUSessionID.Value
+		ngapLog.Tracef("Processing release for PDU Session Id[%d]", pduSessionId)
 
-        var childSAToDelete *context.ChildSecurityAssociation = nil
+		var childSAToDelete *context.ChildSecurityAssociation = nil
 
-        for _, childSA := range ue.TNGFChildSecurityAssociation {
-            for _, id := range childSA.PDUSessionIds {
-                if id == pduSessionId {
-                    childSAToDelete = childSA
-                    break
-                }
-            }
-            if childSAToDelete != nil {
-                break
-            }
-        }
-        
-        if childSAToDelete != nil {
-            if ue.TNGFIKESecurityAssociation != nil {
-                ike_handler.SendIKEDelete(ue.TNGFIKESecurityAssociation, childSAToDelete)
-                tngfSelf.ChildSA.Delete(childSAToDelete.InboundSPI)
+		for _, childSA := range ue.TNGFChildSecurityAssociation {
+			for _, id := range childSA.PDUSessionIds {
+				if id == pduSessionId {
+					childSAToDelete = childSA
+					break
+				}
+			}
+			if childSAToDelete != nil {
+				break
+			}
+		}
 
-                delete(ue.TNGFChildSecurityAssociation, childSAToDelete.InboundSPI)
-            } else {
-                 ngapLog.Error("Cannot trigger IKE DELETE: IKE SA context is missing.")
-            }
-        } else {
-            ngapLog.Warnf("No corresponding Child SA found for PDU Session ID [%d].", pduSessionId)
-        }
-        delete(ue.PduSessionList, pduSessionId)
-        
-        releaseItem := ngapType.PDUSessionResourceReleasedItemRelRes{
-            PDUSessionID: item.PDUSessionID,
-            PDUSessionResourceReleaseResponseTransfer: getPDUSessionResourceReleaseResponseTransfer(),
-        }
-        releaseList.List = append(releaseList.List, releaseItem)
-    }
-    ngap_message.SendPDUSessionResourceReleaseResponse(amf, ue, releaseList, nil)
-    metricStatusOk = true
+		if childSAToDelete != nil {
+			if ue.TNGFIKESecurityAssociation != nil {
+				ike_handler.SendIKEDelete(ue.TNGFIKESecurityAssociation, childSAToDelete)
+				tngfSelf.ChildSA.Delete(childSAToDelete.InboundSPI)
+
+				delete(ue.TNGFChildSecurityAssociation, childSAToDelete.InboundSPI)
+			} else {
+				ngapLog.Error("Cannot trigger IKE DELETE: IKE SA context is missing.")
+			}
+		} else {
+			ngapLog.Warnf("No corresponding Child SA found for PDU Session ID [%d].", pduSessionId)
+		}
+		delete(ue.PduSessionList, pduSessionId)
+
+		releaseItem := ngapType.PDUSessionResourceReleasedItemRelRes{
+			PDUSessionID: item.PDUSessionID,
+			PDUSessionResourceReleaseResponseTransfer: getPDUSessionResourceReleaseResponseTransfer(),
+		}
+		releaseList.List = append(releaseList.List, releaseItem)
+	}
+	ngap_message.SendPDUSessionResourceReleaseResponse(amf, ue, releaseList, nil)
+	metricStatusOk = true
 }
 
 func HandleErrorIndication(amf *context.TNGFAMF, message *ngapType.NGAPPDU) {
