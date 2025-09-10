@@ -310,7 +310,6 @@ func (container *IKEPayloadContainer) BuildNotifyNAS_TCP_PORT(port uint16) {
 	}
 }
 
-
 func (container *IKEPayloadContainer) BuildDelete(protocolID uint8, spiSize uint8, spis []uint32) *Delete {
 	deletePayload := new(Delete)
 

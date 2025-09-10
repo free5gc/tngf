@@ -36,17 +36,13 @@ func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, mes
 
 // SendIKEDelete initiates an INFORMATIONAL exchange with a DELETE payload to delete a Child SA.
 func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.ChildSecurityAssociation) {
-    
     responseIKEMessage := new(ike_message.IKEMessage)
-    
     var responseIKEPayload ike_message.IKEPayloadContainer
 
-    
     if ikeSA == nil || childSA == nil {
         ikeLog.Error("SendIKEDelete failed: IKESecurityAssociation or ChildSecurityAssociation is nil")
         return
     }
-    
     
     ikeSA.InitiatorMessageID++ 
     
@@ -64,12 +60,12 @@ func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.Child
         return
     }
 
-    
     ue := ikeSA.ThisUE
     if ue == nil || ue.IKEConnection == nil {
         ikeLog.Error("Cannot find IKE connection info to send IKE DELETE")
         return
     }
+    
     SendIKEMessageToUE(ue.IKEConnection.Conn, ue.IKEConnection.TNGFAddr, ue.IKEConnection.UEAddr, responseIKEMessage)
     ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for Child SA with SPI [0x%x] to UE", childSA.OutboundSPI)
 }
