@@ -1375,7 +1375,7 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 }
 
 func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message *ike_message.IKEMessage) {
-    ikeLog.Info("Handle INFORMATIONAL")
+	ikeLog.Info("Handle INFORMATIONAL")
 
     tngfSelf := context.TNGFSelf()
     
