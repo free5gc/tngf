@@ -5,8 +5,8 @@ go 1.24
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/free5gc/aper v1.0.6-0.20250102035630-3ddc831eed6a
-	github.com/free5gc/nas v1.2.0
-	github.com/free5gc/ngap v1.1.0
+	github.com/free5gc/nas v1.2.1
+	github.com/free5gc/ngap v1.1.1
 	github.com/free5gc/sctp v1.1.0
 	github.com/free5gc/util v1.2.0
 	github.com/prometheus/client_golang v1.21.0
@@ -27,7 +27,7 @@ require (
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
-	github.com/free5gc/openapi v1.2.0 // indirect
+	github.com/free5gc/openapi v1.2.2 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.10.0 // indirect
