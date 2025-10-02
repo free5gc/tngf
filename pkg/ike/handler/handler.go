@@ -1378,7 +1378,6 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	ikeLog.Info("Handle INFORMATIONAL")
 
 	tngfSelf := context.TNGFSelf()
-
 	localSPI := message.InitiatorSPI
 
 	ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
@@ -1387,26 +1386,46 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		return
 	}
 
-	if ikeSecurityAssociation.RemoteSPI != message.ResponderSPI {
-		ikeLog.Warnf("Responder SPI [0x%x] in INFORMATIONAL response does not match stored UE SPI [0x%x]",
-			message.ResponderSPI, ikeSecurityAssociation.RemoteSPI)
+	// find UE context associated with this IKE SA
+	ue := ikeSecurityAssociation.ThisUE
+	if ue == nil {
+		ikeLog.Error("Cannot find UE context associated with this IKE SA")
 		return
 	}
 
-	encryptedPayload := message.Payloads[0].(*ike_message.Encrypted)
-	decryptedIKEPayload, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
-	if err != nil {
-		ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
-		return
+	// check the information is respond
+	isResponse := (message.Flags & ike_message.ResponseBitCheck) != 0
+	if isResponse {
+		// Use MessageID to find the waiting Channel in the UE context
+		if doneChan, ok := ue.TransactionChannels[message.MessageID]; ok {
+			ikeLog.Infof("Received IKE response for transaction [MessageID: %d].", message.MessageID)
+
+			// notify NGAP Handler to resume
+			doneChan <- true
+
+			// shutdown channel and remove from map
+			close(doneChan)
+			delete(ue.TransactionChannels, message.MessageID)
+		} else {
+			ikeLog.Debugf("Received IKE response, but no handler was waiting for it.")
+		}
+	} else {
+		ikeLog.Infof("Received an INFORMATIONAL request (not a response) from UE [MessageID: %d]", message.MessageID)
 	}
 
-	for _, p := range decryptedIKEPayload {
-		if p.Type() == ike_message.TypeD {
-			ikeLog.Info("Received Delete Payload in INFORMATIONAL response from UE. Peer SA deletion confirmed.")
+	// Decrypt INFORMATIONAL message
+	if len(message.Payloads) > 0 {
+		if encryptedPayload, found := message.Payloads[0].(*ike_message.Encrypted); found {
+			_, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+			if err != nil {
+				ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
+				return
+			}
+			ikeLog.Trace("Successfully decrypted INFORMATIONAL payload.")
 		}
 	}
 
-	ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
+	ikeLog.Infof("Successfully processed INFORMATIONAL exchange for UE [AMF_UE_NGAP_ID: %d]", ue.AmfUeNgapId)
 }
 
 func is_supported(transformType uint8, transformID uint16, attributePresent bool, attributeValue uint16) bool {

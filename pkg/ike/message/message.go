@@ -810,7 +810,7 @@ func (del *Delete) unmarshal(rawData []byte) error {
 	if len(rawData) > 0 {
 		ikeLog.Trace("[Delete] unmarshal(): Unmarshal 1 delete")
 		// bounds checking
-		if len(rawData) <= 4 {
+		if len(rawData) < 4 { // 1 byte Protocol ID + 1 byte SPI Size + 2 bytes Number of SPIs
 			return errors.New("Delete: No sufficient bytes to decode next delete")
 		}
 		spiSize := rawData[1]

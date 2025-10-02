@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -1196,15 +1197,38 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 		printAndGetCause(cause)
 	}
 
-	// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+	// create a channel to wait for IKE response
+	doneChan := make(chan bool, 1)
 
-	// // TODO: release pdu session and gtp info for ue
-	// tngfUe.Remove()
+	// send IKE DELETE request and get the MessageID
+	messageID := ike_handler.SendIKESADeletion(tngfUe.TNGFIKESecurityAssociation)
+	if messageID == 0 {
+		ngapLog.Errorf("Failed to send IKE SA Deletion, MessageID is 0. Releasing context directly.")
+		// send NGAP uecontext complete to AMF avoid blocking
+		// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+		// if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
+		// 	ngapLog.Errorf("Error while releasing UE resources on fallback: %+v", err)
+		// }
+		// metricStatusOk = true
+		// return
+	}
 
-	// Send UE Context Release Complete response to AMF
+	// store channel and MessageID
+	tngfUe.TransactionChannels[messageID] = doneChan
+	ngapLog.Infof("Waiting for IKE response for transaction [MessageID: %d]...", messageID)
+
+	// waiting for ike response or timeout (5 sec)
+	select {
+	case <-doneChan:
+		ngapLog.Infof("IKE response received for transaction [MessageID: %d]. Proceeding with NGAP release.", messageID)
+	case <-time.After(5 * time.Second):
+		ngapLog.Warnf("Timed out waiting for IKE response for transaction [MessageID: %d]", messageID)
+	}
+
+	// receive ike response then send NGAP uecontext complete to AMF
 	ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
 
-	// Release resources
+	// release resource
 	if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
 		ngapLog.Errorf("Error while releasing UE resources: %+v", err)
 	}
