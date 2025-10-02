@@ -1550,6 +1550,17 @@ func handleInformationalResponse(
 		}
 	}
 
+	if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil {
+		if doneChan, ok := ue.TransactionChannels[message.MessageID]; ok {
+			ikeLog.Infof("Received IKE response for transaction [MessageID: %d].", message.MessageID)
+			doneChan <- true
+			close(doneChan)
+			delete(ue.TransactionChannels, message.MessageID)
+		} else {
+			ikeLog.Debug("Received IKE response, but no handler was waiting for it.")
+		}
+	}
+
 	ikeLog.Info("Successfully processed INFORMATIONAL response from UE.")
 }
 

@@ -185,6 +185,8 @@ func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, mes
 
 // SendIKEDelete initiates an INFORMATIONAL exchange with a DELETE payload to delete a Child SA.
 func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.ChildSecurityAssociation) {
+	ikeLog.Info("Send IKE delete")
+
 	if ikeSA == nil || childSA == nil {
 		ikeLog.Error("SendIKEDelete failed: IKESecurityAssociation or ChildSecurityAssociation is nil")
 		return
@@ -220,19 +222,22 @@ func SendIKEDelete(ikeSA *context.IKESecurityAssociation, childSA *context.Child
 	ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for Child SA with SPI [0x%x] to UE", childSA.OutboundSPI)
 }
 
-func SendIKESADeletion(ikeSA *context.IKESecurityAssociation) {
+func SendIKESADeletion(ikeSA *context.IKESecurityAssociation) (messageID uint32) {
+	ikeLog.Info("Send IKESA delete")
+
 	if ikeSA == nil {
-		ikeLog.Error("SendIKESADeletion failed: IKESecurityAssociation is nil")
-		return
+		ikeLog.Error("Send IKESA deletion failed: IKESecurityAssociation is nil")
+		return 0
 	}
 
 	ue := ikeSA.ThisUE.Load()
 	if ue == nil || ue.IKEConnection == nil {
 		ikeLog.Error("Cannot find IKE connection info to send IKE SA DELETE")
-		return
+		return 0
 	}
 
 	ikeSA.InitiatorMessageID++
+	messageID = ikeSA.InitiatorMessageID
 
 	ikeMessage := new(ike_message.IKEMessage)
 	var ikePayload ike_message.IKEPayloadContainer
@@ -249,9 +254,11 @@ func SendIKESADeletion(ikeSA *context.IKESecurityAssociation) {
 
 	if err := EncryptProcedure(ikeSA, ikePayload, ikeMessage); err != nil {
 		ikeLog.Errorf("Encrypting IKE SA DELETE message failed: %+v", err)
-		return
+		return 0
 	}
 
 	SendIKEMessageToUE(ue.IKEConnection.Conn, ue.IKEConnection.TNGFAddr, ue.IKEConnection.UEAddr, ikeMessage)
 	ikeLog.Infof("Sent IKE INFORMATIONAL (DELETE) for IKE SA to UE")
+
+	return messageID
 }

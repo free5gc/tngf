@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -1141,6 +1142,27 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapMessage.UE
 		printAndGetCause(cause)
 	}
 
+	// Send IKE DELETE request and wait briefly for the peer response before reporting NGAP release complete.
+	messageID := ike_handler.SendIKESADeletion(tngfUe.TNGFIKESecurityAssociation)
+	if messageID == 0 {
+		ngapLog.Errorf("Failed to send IKE SA Deletion, MessageID is 0. Releasing context directly.")
+	} else {
+		doneChan := make(chan bool, 1)
+		if tngfUe.TransactionChannels == nil {
+			tngfUe.TransactionChannels = make(map[uint32]chan bool)
+		}
+		tngfUe.TransactionChannels[messageID] = doneChan
+		ngapLog.Infof("Waiting for IKE response for transaction [MessageID: %d]...", messageID)
+
+		select {
+		case <-doneChan:
+			ngapLog.Infof("IKE response received for transaction [MessageID: %d]. Proceeding with NGAP release.", messageID)
+		case <-time.After(5 * time.Second):
+			ngapLog.Warnf("Timed out waiting for IKE response for transaction [MessageID: %d]", messageID)
+			delete(tngfUe.TransactionChannels, messageID)
+		}
+	}
+
 	ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
 
 	if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
@@ -1155,12 +1177,6 @@ func releaseTngfUeAndIkeSa(ue *context.TNGFUe) error {
 
 	if ue == nil {
 		return errors.New("TNGFUe is nil")
-	}
-
-	if ue.TNGFIKESecurityAssociation != nil {
-		ike_handler.SendIKESADeletion(ue.TNGFIKESecurityAssociation)
-	} else {
-		ngapLog.Warnf("UE[AMF_UE_NGAP_ID: %d] has no IKE Security Association to release.", ue.AmfUeNgapId)
 	}
 
 	ue.Remove()
