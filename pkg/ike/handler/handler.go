@@ -1397,7 +1397,7 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	isResponse := (message.Flags & ike_message.ResponseBitCheck) != 0
 	if isResponse {
 		// Use MessageID to find the waiting Channel in the UE context
-		if doneChan, ok := ue.TransactionChannels[message.MessageID]; ok {
+		if doneChan, find := ue.TransactionChannels[message.MessageID]; find {
 			ikeLog.Infof("Received IKE response for transaction [MessageID: %d].", message.MessageID)
 
 			// notify NGAP Handler to resume
