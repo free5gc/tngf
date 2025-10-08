@@ -1372,7 +1372,16 @@ func BuildPDUSessionResourceReleaseResponse(
 	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
 	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentUserLocationInformation
 	// 		ie.Value.UserLocationInformation = ue.GetUserLocationInformation()
-
+	//
+	// 		userLocationInformation := ie.Value.UserLocationInformation
+	// 		*userLocationInformation = ngapType.UserLocationInformation{
+	// 			Present: ngapType.UserLocationInformationPresentUserLocationInformationTNGF,
+	// 			UserLocationInformationTNGF: &ngapType.UserLocationInformationTNGF{
+	// 				IPAddress:  ngapConvert.IPAddressToNgap(ue.IPAddrv4, ue.IPAddrv6),
+	// 				PortNumber: ngapConvert.PortNumberToNgap(ue.PortNumber),
+	// 			},
+	// 		}
+	//
 	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
 	// 	}
 	// 	// CriticalityDiagnostics
