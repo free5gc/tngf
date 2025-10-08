@@ -1135,6 +1135,7 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapMessage.UE
 
 	if tngfUe == nil {
 		// TODO: send error indication(unknown local ngap ue id)
+		ngapLog.Error("TngfUE is nil")
 		return
 	}
 
@@ -1146,21 +1147,27 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapMessage.UE
 	messageID := ike_handler.SendIKESADeletion(tngfUe.TNGFIKESecurityAssociation)
 	if messageID == 0 {
 		ngapLog.Errorf("Failed to send IKE SA Deletion, MessageID is 0. Releasing context directly.")
-	} else {
-		doneChan := make(chan bool, 1)
-		if tngfUe.TransactionChannels == nil {
-			tngfUe.TransactionChannels = make(map[uint32]chan bool)
+		ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+		if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
+			ngapLog.Errorf("Error while releasing UE resources on fallback: %+v", err)
 		}
-		tngfUe.TransactionChannels[messageID] = doneChan
-		ngapLog.Infof("Waiting for IKE response for transaction [MessageID: %d]...", messageID)
+		metricStatusOk = true
+		return
+	}
 
-		select {
-		case <-doneChan:
-			ngapLog.Infof("IKE response received for transaction [MessageID: %d]. Proceeding with NGAP release.", messageID)
-		case <-time.After(5 * time.Second):
-			ngapLog.Warnf("Timed out waiting for IKE response for transaction [MessageID: %d]", messageID)
-			delete(tngfUe.TransactionChannels, messageID)
-		}
+	doneChan := make(chan bool, 1)
+	if tngfUe.TransactionChannels == nil {
+		tngfUe.TransactionChannels = make(map[uint32]chan bool)
+	}
+	tngfUe.TransactionChannels[messageID] = doneChan
+	ngapLog.Infof("Waiting for IKE response for transaction [MessageID: %d]...", messageID)
+
+	select {
+	case <-doneChan:
+		ngapLog.Infof("IKE response received for transaction [MessageID: %d]. Proceeding with NGAP release.", messageID)
+	case <-time.After(5 * time.Second):
+		ngapLog.Warnf("Timed out waiting for IKE response for transaction [MessageID: %d]", messageID)
+		delete(tngfUe.TransactionChannels, messageID)
 	}
 
 	ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
