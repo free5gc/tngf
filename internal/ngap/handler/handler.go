@@ -1190,6 +1190,7 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 
 	if tngfUe == nil {
 		// TODO: send error indication(unknown local ngap ue id)
+		ngapLog.Error("TngfUE is nil")
 		return
 	}
 
@@ -1205,12 +1206,11 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 	if messageID == 0 {
 		ngapLog.Errorf("Failed to send IKE SA Deletion, MessageID is 0. Releasing context directly.")
 		// send NGAP uecontext complete to AMF avoid blocking
-		// ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
-		// if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
-		// 	ngapLog.Errorf("Error while releasing UE resources on fallback: %+v", err)
-		// }
-		// metricStatusOk = true
-		// return
+		ngap_message.SendUEContextReleaseComplete(amf, tngfUe, nil)
+		if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
+			ngapLog.Errorf("Error while releasing UE resources on fallback: %+v", err)
+		}
+		return
 	}
 
 	// store channel and MessageID
