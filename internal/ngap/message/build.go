@@ -776,93 +776,30 @@ func BuildPDUSessionResourceNotify(
 }
 
 func BuildPDUSessionResourceReleaseResponse(
-	*context.TNGFUe, ie.PDUSessionResourceReleasedListRelRes, *ie.CriticalityDiagnostics,
+	ue *context.TNGFUe,
+	relList ie.PDUSessionResourceReleasedListRelRes,
+	diagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
-	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
-	//
-	// 	successfulOutcome := pdu.SuccessfulOutcome
-	// 	successfulOutcome.ProcedureCode.Value = ngapType.ProcedureCodePDUSessionResourceRelease
-	// 	successfulOutcome.Criticality.Value = ngapType.CriticalityPresentReject
-	//
-	// 	successfulOutcome.Value.Present = ngapType.SuccessfulOutcomePresentPDUSessionResourceReleaseResponse
-	// 	successfulOutcome.Value.PDUSessionResourceReleaseResponse = new(ngapType.PDUSessionResourceReleaseResponse)
-	//
-	// 	pDUSessionResourceReleaseResponse := successfulOutcome.Value.PDUSessionResourceReleaseResponse
-	// 	pDUSessionResourceReleaseResponseIEs := &pDUSessionResourceReleaseResponse.ProtocolIEs
-	// 	// AMFUENGAPID
-	// 	{
-	// 		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	// 		ie.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentAMFUENGAPID
-	// 		ie.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	//
-	// 		aMFUENGAPID := ie.Value.AMFUENGAPID
-	// 		aMFUENGAPID.Value = ue.AmfUeNgapId
-	//
-	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
-	// 	}
-	// 	// RANUENGAPID
-	// 	{
-	// 		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	// 		ie.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentRANUENGAPID
-	// 		ie.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	//
-	// 		rANUENGAPID := ie.Value.RANUENGAPID
-	// 		rANUENGAPID.Value = ue.RanUeNgapId
-	//
-	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
-	// 	}
-	// 	// PDUSessionResourceReleasedListRelRes
-	// 	{
-	// 		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	// 		ie.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceReleasedListRelRes
-	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentPDUSessionResourceReleasedListRelRes
-	// 		ie.Value.PDUSessionResourceReleasedListRelRes = new(ngapType.PDUSessionResourceReleasedListRelRes)
-	//
-	// 		pDUSessionResourceReleasedListRelRes := ie.Value.PDUSessionResourceReleasedListRelRes
-	// 		*pDUSessionResourceReleasedListRelRes = relList
-	//
-	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
-	// 	}
-	// 	// UserLocationInformation
-	// 	if (ue.IPAddrv4 != "" || ue.IPAddrv6 != "") && ue.PortNumber != 0 {
-	// 		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	// 		ie.Id.Value = ngapType.ProtocolIEIDUserLocationInformation
-	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentUserLocationInformation
-	// 		ie.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
-	//
-	// 		userLocationInformation := ie.Value.UserLocationInformation
-	// 		*userLocationInformation = ngapType.UserLocationInformation{
-	// 			Present: ngapType.UserLocationInformationPresentUserLocationInformationTNGF,
-	// 			UserLocationInformationTNGF: &ngapType.UserLocationInformationTNGF{
-	// 				IPAddress:  ngapConvert.IPAddressToNgap(ue.IPAddrv4, ue.IPAddrv6),
-	// 				PortNumber: ngapConvert.PortNumberToNgap(ue.PortNumber),
-	// 			},
-	// 		}
-	//
-	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
-	// 	}
-	// 	// CriticalityDiagnostics
-	// 	if diagnostics != nil {
-	// 		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	// 		ie.Id.Value = ngapType.ProtocolIEIDCriticalityDiagnostics
-	// 		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	// 		ie.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentCriticalityDiagnostics
-	// 		ie.Value.CriticalityDiagnostics = new(ngapType.CriticalityDiagnostics)
-	//
-	// 		criticalityDiagnostics := ie.Value.CriticalityDiagnostics
-	// 		*criticalityDiagnostics = *diagnostics
-	//
-	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
-	// 	}
-	//
-	return nil, errBuilderNotImplemented
+	if ue == nil {
+		return nil, errors.New("UE context is nil")
+	}
+
+	var userLocationInformation *ie.UserLocationInformation
+	if ue.IPAddrv4 != "" || ue.IPAddrv6 != "" {
+		var err error
+		userLocationInformation, err = buildUserLocationInformation(ue)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return (&ngapMessage.PDUSessionResourceReleaseResponse{
+		AMFUENGAPID:                          &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
+		RANUENGAPID:                          &ie.RANUENGAPID{Value: ue.RanUeNgapId},
+		PDUSessionResourceReleasedListRelRes: &relList,
+		UserLocationInformation:              userLocationInformation,
+		CriticalityDiagnostics:               diagnostics,
+	}).MarshalBinary()
 }
 
 func BuildErrorIndication(*int64, *int64, *ie.Cause, *ie.CriticalityDiagnostics) ([]byte, error) {
