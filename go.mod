@@ -1,21 +1,21 @@
 module github.com/free5gc/tngf
 
-go 1.24
+go 1.25.5
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/free5gc/aper v1.0.6-0.20250102035630-3ddc831eed6a
-	github.com/free5gc/nas v1.2.1
-	github.com/free5gc/ngap v1.1.1
-	github.com/free5gc/sctp v1.1.0
-	github.com/free5gc/util v1.2.0
+	github.com/free5gc/aper v1.1.0
+	github.com/free5gc/nas v1.2.2
+	github.com/free5gc/ngap v1.1.2
+	github.com/free5gc/sctp v1.1.1
+	github.com/free5gc/util v1.3.1
 	github.com/prometheus/client_golang v1.21.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/vishvananda/netlink v1.1.0
 	github.com/wmnsk/go-gtp v0.8.0
-	golang.org/x/net v0.38.0
-	golang.org/x/sys v0.31.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sys v0.38.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -27,7 +27,7 @@ require (
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
-	github.com/free5gc/openapi v1.2.2 // indirect
+	github.com/free5gc/openapi v1.2.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.10.0 // indirect
@@ -57,8 +57,8 @@ require (
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
