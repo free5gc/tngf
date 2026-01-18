@@ -1129,7 +1129,7 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 	var iesCriticalityDiagnostics ngapType.CriticalityDiagnosticsIEList
 
 	metricStatusOk := false
-	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.UE_CONTEXT_RELEASE_COMMAND, &metricStatusOk, cause)
 
 	var tngfUe *context.TNGFUe
 	tngfSelf := context.TNGFSelf()
@@ -1231,6 +1231,7 @@ func HandleUEContextReleaseCommand(amf *context.TNGFAMF, message *ngapType.NGAPP
 	// release resource
 	if err := releaseTngfUeAndIkeSa(tngfUe); err != nil {
 		ngapLog.Errorf("Error while releasing UE resources: %+v", err)
+		return
 	}
 
 	metricStatusOk = true
@@ -2172,7 +2173,7 @@ func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapT
 
 	var cause *ngapType.Cause
 	metricStatusOk := false
-	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.INITIAL_CONTEXT_SETUP_REQUEST, &metricStatusOk, cause)
+	defer ngap_metrics.IncrMetricsRcvMsg(ngap_metrics.PDUSESSION_RESOURCE_RELEASE_COMMAND, &metricStatusOk, cause)
 
 	if amf == nil {
 		ngapLog.Error("AMF Context is nil")
