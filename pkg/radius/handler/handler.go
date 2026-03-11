@@ -82,6 +82,18 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 	session, ok := tngfSelf.RadiusSessionPoolLoad(callingStationId)
 	if !ok {
 		session = tngfSelf.NewRadiusSession(callingStationId)
+	} else if session.State != EAP5GStart && len(eapMessage) > 0 {
+		// Detect reconnect: existing session receives a fresh EAP Identity response
+		eapCheck := &radius_message.EAP{}
+		if unmarshalErr := eapCheck.Unmarshal(eapMessage); unmarshalErr == nil {
+			if eapCheck.Code == radius_message.EAPCodeResponse &&
+				len(eapCheck.EAPTypeData) > 0 &&
+				eapCheck.EAPTypeData[0].Type() == radius_message.EAPTypeIdentity {
+				radiusLog.Infof("UE [%s] is reconnecting, resetting session", callingStationId)
+				tngfSelf.DeleteRadiusSession(callingStationId)
+				session = tngfSelf.NewRadiusSession(callingStationId)
+			}
+		}
 	}
 
 	switch session.State {
