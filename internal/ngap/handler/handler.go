@@ -1431,9 +1431,20 @@ func HandleDownlinkNASTransport(amf *context.TNGFAMF, message *ngapType.NGAPPDU)
 				tngfUe.RadiusConnection.UEAddr, responseRadiusMessage)
 		} else {
 			// Using a "NAS message envelope" to transport a NAS message
-			// over the non-3GPP access between the UE and the N3IWF
 			nasEnv := encapNasMsgToEnvelope(nasPDU)
-			tngfUe.TemporaryCachedNASMessage = nasEnv
+			if tngfUe.TCPConnection != nil {
+				// TCP connection already established – write directly so the UE
+				// can receive the message (e.g. Deregistration Accept) right away.
+				if n, err := tngfUe.TCPConnection.Write(nasEnv); err != nil {
+					ngapLog.Errorf("Send NAS to UE via TCP failed: %+v", err)
+				} else {
+					ngapLog.Tracef("Forwarded downlink NAS to UE via TCP. Wrote %d bytes", n)
+				}
+			} else {
+				// TCP connection not yet established – cache the message and
+				// deliver it once the connection comes up.
+				tngfUe.TemporaryCachedNASMessage = nasEnv
+			}
 		}
 	}
 	metricStatusOk = true
