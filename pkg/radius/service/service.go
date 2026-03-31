@@ -44,8 +44,7 @@ func listenAndServe(localAddr *net.UDPAddr, errChan chan<- error) {
 	radiusLog.Infof("Radius packet received")
 	defer func() {
 		if p := recover(); p != nil {
-			// Print stack for panic to log. Fatalf() will let program exit.
-			logger.RadiusLog.Fatalf(" panic: %v\n%s", p, string(debug.Stack()))
+			logger.RadiusLog.Errorf("Recovered panic in radius service: %v\n%s", p, string(debug.Stack()))
 		}
 	}()
 

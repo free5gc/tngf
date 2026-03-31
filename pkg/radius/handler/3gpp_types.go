@@ -265,6 +265,10 @@ func UnmarshalEAP5GData(codedData []byte) (
 						// TS 24.501 9.11.3.4
 						radiusLog.Debugf("-> Parameter type: UE Identity")
 						if parameterLength != 0 {
+							if parameterLength < 3 {
+								return 0, nil, nil, errors.New("UE Identity parameter too short")
+							}
+
 							parameterValue := anParameterField[2:]
 
 							if len(parameterValue) < int(parameterLength) {
@@ -273,14 +277,23 @@ func UnmarshalEAP5GData(codedData []byte) (
 								parameterValue = parameterValue[:parameterLength]
 							}
 
+							if len(parameterValue) < 3 {
+								return 0, nil, nil, errors.New("UE Identity value too short")
+							}
+
 							var iei uint8
 							var valLen uint16
 							iei = parameterValue[0]
 							valLen = binary.BigEndian.Uint16(parameterValue[1:3])
 
+							mobileIdentityContents := parameterValue[3:]
+							if int(valLen) != len(mobileIdentityContents) {
+								return 0, nil, nil, errors.New("UE Identity length mismatch")
+							}
+
 							ueIdentity := nasType.NewMobileIdentity5GS(iei)
 							ueIdentity.SetLen(valLen)
-							ueIdentity.SetMobileIdentity5GSContents(parameterValue[3:])
+							ueIdentity.SetMobileIdentity5GSContents(mobileIdentityContents)
 
 							anParameters.UEIdentity = ueIdentity
 						} else {

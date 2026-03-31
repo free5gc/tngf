@@ -31,6 +31,61 @@ const (
 	InitialContextSetup
 )
 
+func addResponseMessageAuthenticator(
+	responseRadiusMessage *radius_message.RadiusMessage,
+	responseRadiusPayload *radius_message.RadiusPayloadContainer,
+	requestMessageAuthenticator []byte,
+) {
+	if requestMessageAuthenticator == nil {
+		return
+	}
+
+	tmpRadiusMessage := *responseRadiusMessage
+	payload := new(radius_message.RadiusPayload)
+	payload.Type = radius_message.TypeMessageAuthenticator
+	payload.Length = uint8(18)
+	payload.Val = make([]byte, 16)
+
+	tmpResponseRadiusPayload := *responseRadiusPayload
+	tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+	tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
+
+	payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
+	*responseRadiusPayload = append(*responseRadiusPayload, *payload)
+}
+
+func sendAccessReject(
+	udpConn *net.UDPConn,
+	tngfAddr, ueAddr *net.UDPAddr,
+	requestMessage *radius_message.RadiusMessage,
+	requestMessageAuthenticator []byte,
+) {
+	responseRadiusMessage := new(radius_message.RadiusMessage)
+	var responseRadiusPayload radius_message.RadiusPayloadContainer
+
+	responseRadiusMessage.BuildRadiusHeader(radius_message.AccessReject, requestMessage.PktID, requestMessage.Auth)
+	addResponseMessageAuthenticator(responseRadiusMessage, &responseRadiusPayload, requestMessageAuthenticator)
+	responseRadiusMessage.Payloads = responseRadiusPayload
+	SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
+}
+
+func sendEAPFailureChallenge(
+	udpConn *net.UDPConn,
+	tngfAddr, ueAddr *net.UDPAddr,
+	requestMessage *radius_message.RadiusMessage,
+	requestMessageAuthenticator []byte,
+	identifier uint8,
+) {
+	responseRadiusMessage := new(radius_message.RadiusMessage)
+	var responseRadiusPayload radius_message.RadiusPayloadContainer
+
+	responseRadiusMessage.BuildRadiusHeader(radius_message.AccessChallenge, requestMessage.PktID, requestMessage.Auth)
+	responseRadiusPayload.BuildEAPfailure(identifier)
+	addResponseMessageAuthenticator(responseRadiusMessage, &responseRadiusPayload, requestMessageAuthenticator)
+	responseRadiusMessage.Payloads = responseRadiusPayload
+	SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
+}
+
 func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr,
 	message *radius_message.RadiusMessage,
 ) {
@@ -58,10 +113,16 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			eapMessage = radiusPayload.Val
 		case radius_message.TypeCalledStationId:
 			calledStationId = string(radiusPayload.Val)
+			if len(calledStationId) < 17 {
+				radiusLog.Warn("Request Message CalledStationId is too short")
+				sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
+				return
+			}
 			calledStationId = strings.ReplaceAll(calledStationId[:17], "-", "")
 			tnapId, err = strconv.ParseUint(calledStationId, 16, 64)
 			if err != nil {
 				radiusLog.Errorln("Request Message CalledStationId error", err)
+				sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 				return
 			}
 		case radius_message.TypeMessageAuthenticator:
@@ -73,6 +134,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			radiusLog.Debugln("expected authenticator:\n", hex.Dump(exRequestMessageAuthenticator))
 			if !bytes.Equal(requestMessageAuthenticator, exRequestMessageAuthenticator) {
 				radiusLog.Errorln("Request Message Authenticator error")
+				sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 				return
 			}
 		}
@@ -133,14 +195,28 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	case EAP5GNAS:
 		radiusLog.Infoln("Handle EAP-Res/5G-NAS")
+		if len(eapMessage) < 4 {
+			radiusLog.Warn("[EAP] Missing or too short EAP payload in EAP5GNAS state")
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
+			return
+		}
+
 		eap := &radius_message.EAP{}
 		err = eap.Unmarshal(eapMessage)
 		if err != nil {
 			radiusLog.Errorf("[EAP] EAP5GNAS unmarshal error: %+v", err)
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 			return
 		}
 		if eap.Code != radius_message.EAPCodeResponse {
 			radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
+			sendEAPFailureChallenge(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator, eap.Identifier)
+			return
+		}
+
+		if len(eap.EAPTypeData) == 0 {
+			radiusLog.Error("[EAP] EAP type data is empty in EAP5GNAS state")
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 			return
 		}
 
@@ -152,21 +228,25 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			eapExpanded = eapTypeData.(*radius_message.EAPExpanded)
 		default:
 			radiusLog.Errorf("[EAP] Received EAP packet with type other than EAP expanded type: %d", eapTypeData.Type())
+			sendEAPFailureChallenge(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator, eap.Identifier)
 			return
 		}
 
 		if eapExpanded.VendorID != radius_message.VendorID3GPP {
 			radiusLog.Error("The peer sent EAP expended packet with wrong vendor ID. Drop the packet.")
+			sendEAPFailureChallenge(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator, eap.Identifier)
 			return
 		}
 		if eapExpanded.VendorType != radius_message.VendorTypeEAP5G {
 			radiusLog.Error("The peer sent EAP expanded packet with wrong vendor type. Drop the packet.")
+			sendEAPFailureChallenge(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator, eap.Identifier)
 			return
 		}
 
 		eap5GMessageID, anParameters, nasPDU, unmarshal_err := UnmarshalEAP5GData(eapExpanded.VendorData)
 		if unmarshal_err != nil {
 			radiusLog.Errorf("Unmarshalling EAP-5G packet failed: %+v", unmarshal_err)
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 			return
 		}
 
@@ -331,6 +411,18 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	case InitialContextSetup:
 		radiusLog.Infoln("Handle EAP-Res/5G-Notification")
+		if len(eapMessage) < 2 {
+			radiusLog.Warn("[EAP] Missing or too short EAP payload in InitialContextSetup state")
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
+			return
+		}
+
+		if session.ThisUE == nil {
+			radiusLog.Warn("[EAP] Missing UE context in InitialContextSetup state")
+			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
+			return
+		}
+
 		identifier := eapMessage[1]
 		responseRadiusMessage.BuildRadiusHeader(radius_message.AccessAccept, message.PktID, message.Auth)
 		responseRadiusPayload.BuildEAPSuccess(identifier)

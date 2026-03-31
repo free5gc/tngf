@@ -205,6 +205,9 @@ func (eap *EAP) Unmarshal(rawData []byte) error {
 
 		// EAP Success or Failed
 		if eapPayloadLength == 4 {
+			if eap.Code != EAPCodeSuccess && eap.Code != EAPCodeFailure {
+				return errors.New("EAP: Request/Response payload missing EAP type data")
+			}
 			return nil
 		}
 
