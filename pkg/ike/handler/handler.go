@@ -554,6 +554,9 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 					continue
 				}
 			} // Optional
+			if encryptionAlgorithmTransform.TransformID == ike_message.ENCR_NULL && integrityAlgorithmTransform == nil {
+				continue
+			}
 			if len(proposal.DiffieHellmanGroup) > 0 {
 				for _, transform := range proposal.DiffieHellmanGroup {
 					if is_Kernel_Supported(ike_message.TypeDiffieHellmanGroup, transform.TransformID,
