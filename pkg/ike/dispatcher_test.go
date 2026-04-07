@@ -1,8 +1,10 @@
-package ike
+package ike_test
 
 import (
 	"net"
 	"testing"
+
+	"github.com/free5gc/tngf/pkg/ike"
 )
 
 func TestDispatchDropsShortUDP4500PacketWithoutPanic(t *testing.T) {
@@ -15,5 +17,5 @@ func TestDispatchDropsShortUDP4500PacketWithoutPanic(t *testing.T) {
 		}
 	}()
 
-	Dispatch(nil, localAddr, remoteAddr, []byte{0x00, 0x00, 0x00})
+	ike.Dispatch(nil, localAddr, remoteAddr, []byte{0x00, 0x00, 0x00})
 }
