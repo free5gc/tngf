@@ -748,9 +748,11 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 			switch attribute.Type {
 			case ike_message.INTERNAL_IP4_ADDRESS:
 				addrRequest = true
-				if len(attribute.Value) != 0 {
+				if len(attribute.Value) >= 4 {
 					ikeLog.Tracef("Got client requested address: %d.%d.%d.%d",
 						attribute.Value[0], attribute.Value[1], attribute.Value[2], attribute.Value[3])
+				} else if len(attribute.Value) != 0 {
+					ikeLog.Warnf("Ignore malformed INTERNAL_IP4_ADDRESS attribute with short length: %d", len(attribute.Value))
 				}
 			default:
 				ikeLog.Warnf("Receive other type of configuration request: %d", attribute.Type)
