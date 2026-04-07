@@ -31,36 +31,6 @@ const (
 	InitialContextSetup
 )
 
-func sendAccessReject(
-	udpConn *net.UDPConn,
-	tngfAddr, ueAddr *net.UDPAddr,
-	requestMessage *radius_message.RadiusMessage,
-	requestMessageAuthenticator []byte,
-) {
-	responseRadiusMessage := new(radius_message.RadiusMessage)
-	var responseRadiusPayload radius_message.RadiusPayloadContainer
-
-	responseRadiusMessage.BuildRadiusHeader(radius_message.AccessReject, requestMessage.PktID, requestMessage.Auth)
-
-	if requestMessageAuthenticator != nil {
-		tmpRadiusMessage := *responseRadiusMessage
-		payload := new(radius_message.RadiusPayload)
-		payload.Type = radius_message.TypeMessageAuthenticator
-		payload.Length = uint8(18)
-		payload.Val = make([]byte, 16)
-
-		tmpResponseRadiusPayload := responseRadiusPayload
-		tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
-		tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
-
-		payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
-		responseRadiusPayload = append(responseRadiusPayload, *payload)
-	}
-
-	responseRadiusMessage.Payloads = responseRadiusPayload
-	SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
-}
-
 func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr,
 	message *radius_message.RadiusMessage,
 ) {
@@ -163,7 +133,6 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		}
 		if len(eap.EAPTypeData) == 0 {
 			radiusLog.Error("[EAP] malformed EAP: missing type data")
-			sendAccessReject(udpConn, tngfAddr, ueAddr, message, requestMessageAuthenticator)
 			return
 		}
 
