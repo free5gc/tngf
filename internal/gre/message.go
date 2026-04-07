@@ -1,6 +1,9 @@
 package gre
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 // [TS 24.502] 9.3.3 GRE encapsulated user data packet
 const (
@@ -34,6 +37,10 @@ func (p *GREPacket) Marshal() []byte {
 }
 
 func (p *GREPacket) Unmarshal(b []byte) error {
+	if len(b) < 4 {
+		return fmt.Errorf("gre packet too short: got %d, need at least 4", len(b))
+	}
+
 	p.flags = b[0]
 	p.version = b[1]
 
@@ -42,6 +49,10 @@ func (p *GREPacket) Unmarshal(b []byte) error {
 	offset := 4
 
 	if p.GetKeyFlag() {
+		if len(b) < offset+GREHeaderKeyFieldLength {
+			return fmt.Errorf("gre packet with key flag too short: got %d, need at least %d", len(b), offset+GREHeaderKeyFieldLength)
+		}
+
 		p.key = binary.BigEndian.Uint32(b[offset : offset+GREHeaderKeyFieldLength])
 		offset += GREHeaderKeyFieldLength
 	}

@@ -52,8 +52,8 @@ func Run(ctx context.Context) error {
 func listenAndServe(ipv4PacketConn *ipv4.PacketConn) {
 	defer func() {
 		if p := recover(); p != nil {
-			// Print stack for panic to log. Fatalf() will let program exit.
-			logger.NWtUPLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
+			// Keep process alive on malformed user-plane packets.
+			logger.NWtUPLog.Errorf("panic: %v\n%s", p, string(debug.Stack()))
 		}
 
 		err := ipv4PacketConn.Close()
@@ -89,8 +89,8 @@ func listenAndServe(ipv4PacketConn *ipv4.PacketConn) {
 func forward(ueInnerIP string, ifIndex int, rawData []byte) {
 	defer func() {
 		if p := recover(); p != nil {
-			// Print stack for panic to log. Fatalf() will let program exit.
-			logger.NWtUPLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
+			// Keep process alive on malformed user-plane packets.
+			logger.NWtUPLog.Errorf("panic: %v\n%s", p, string(debug.Stack()))
 		}
 	}()
 
