@@ -1421,7 +1421,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 	case ike_message.TypePseudorandomFunction:
 		switch transformID {
 		case ike_message.PRF_HMAC_MD5:
-			return true
+			return false
 		case ike_message.PRF_HMAC_SHA1:
 			return true
 		case ike_message.PRF_HMAC_TIGER:
@@ -1434,7 +1434,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 		case ike_message.AUTH_NONE:
 			return false
 		case ike_message.AUTH_HMAC_MD5_96:
-			return true
+			return false
 		case ike_message.AUTH_HMAC_SHA1_96:
 			return true
 		case ike_message.AUTH_DES_MAC:
@@ -1453,7 +1453,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 		case ike_message.DH_768_BIT_MODP:
 			return false
 		case ike_message.DH_1024_BIT_MODP:
-			return true
+			return false
 		case ike_message.DH_1536_BIT_MODP:
 			return false
 		case ike_message.DH_2048_BIT_MODP:
