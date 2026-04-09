@@ -50,7 +50,11 @@ func (p *GREPacket) Unmarshal(b []byte) error {
 
 	if p.GetKeyFlag() {
 		if len(b) < offset+GREHeaderKeyFieldLength {
-			return fmt.Errorf("gre packet with key flag too short: got %d, need at least %d", len(b), offset+GREHeaderKeyFieldLength)
+			return fmt.Errorf(
+				"gre packet with key flag too short: got %d, need at least %d",
+				len(b),
+				offset+GREHeaderKeyFieldLength,
+			)
 		}
 
 		p.key = binary.BigEndian.Uint32(b[offset : offset+GREHeaderKeyFieldLength])
