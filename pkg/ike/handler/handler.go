@@ -555,6 +555,7 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 				}
 			} // Optional
 			if encryptionAlgorithmTransform.TransformID == ike_message.ENCR_NULL && integrityAlgorithmTransform == nil {
+				ikeLog.Warn("Reject Child SA proposal: ENCR_NULL without integrity")
 				continue
 			}
 			if len(proposal.DiffieHellmanGroup) > 0 {
