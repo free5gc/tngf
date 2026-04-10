@@ -342,6 +342,30 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 
 	case InitialContextSetup:
 		radiusLog.Infoln("Handle EAP-Res/5G-Notification")
+		if len(eapMessage) < 2 {
+			radiusLog.Warn("[EAP] Missing or too short EAP payload in InitialContextSetup state")
+			responseRadiusMessage.BuildRadiusHeader(radius_message.AccessReject, message.PktID, message.Auth)
+
+			if requestMessageAuthenticator != nil {
+				tmpRadiusMessage := *responseRadiusMessage
+				payload := new(radius_message.RadiusPayload)
+				payload.Type = radius_message.TypeMessageAuthenticator
+				payload.Length = uint8(18)
+				payload.Val = make([]byte, 16)
+
+				tmpResponseRadiusPayload := responseRadiusPayload
+				tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+				tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
+
+				payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
+				responseRadiusPayload = append(responseRadiusPayload, *payload)
+			}
+
+			responseRadiusMessage.Payloads = responseRadiusPayload
+			SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
+			return
+		}
+
 		identifier := eapMessage[1]
 		responseRadiusMessage.BuildRadiusHeader(radius_message.AccessAccept, message.PktID, message.Auth)
 		responseRadiusPayload.BuildEAPSuccess(identifier)
