@@ -131,6 +131,29 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			radiusLog.Error("[EAP] Received an EAP payload with code other than response. Drop the payload.")
 			return
 		}
+		if len(eap.EAPTypeData) == 0 {
+			radiusLog.Error("[EAP] malformed EAP: missing type data")
+			responseRadiusMessage.BuildRadiusHeader(radius_message.AccessReject, message.PktID, message.Auth)
+
+			if requestMessageAuthenticator != nil {
+				tmpRadiusMessage := *responseRadiusMessage
+				payload := new(radius_message.RadiusPayload)
+				payload.Type = radius_message.TypeMessageAuthenticator
+				payload.Length = uint8(18)
+				payload.Val = make([]byte, 16)
+
+				tmpResponseRadiusPayload := responseRadiusPayload
+				tmpResponseRadiusPayload = append(tmpResponseRadiusPayload, *payload)
+
+				tmpRadiusMessage.Payloads = tmpResponseRadiusPayload
+
+				payload.Val = GetMessageAuthenticator(&tmpRadiusMessage)
+				responseRadiusPayload = append(responseRadiusPayload, *payload)
+			}
+			responseRadiusMessage.Payloads = responseRadiusPayload
+			SendRadiusMessageToUE(udpConn, tngfAddr, ueAddr, responseRadiusMessage)
+			return
+		}
 
 		eapTypeData := eap.EAPTypeData[0]
 		var eapExpanded *radius_message.EAPExpanded
