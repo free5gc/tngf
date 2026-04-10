@@ -205,13 +205,18 @@ func (context *TNGFContext) DeleteIKESecurityAssociation(spi uint64) {
 
 func (context *TNGFContext) UELoadbyIDi(idi []byte) *TNGFUe {
 	var ue *TNGFUe
+	strIdi := hex.EncodeToString(idi)
 	context.UePool.Range(func(_, thisUE interface{}) bool {
-		strIdi := hex.EncodeToString(idi)
-		strSuci := hex.EncodeToString(thisUE.(*TNGFUe).UEIdentity.Buffer)
+		candidate := thisUE.(*TNGFUe)
+		if candidate == nil || candidate.UEIdentity == nil {
+			return true
+		}
+
+		strSuci := hex.EncodeToString(candidate.UEIdentity.Buffer)
 		contextLog.Debugln("Idi", strIdi)
 		contextLog.Debugln("SUCI", strSuci)
 		if strIdi == strSuci {
-			ue = thisUE.(*TNGFUe)
+			ue = candidate
 			return false
 		}
 		return true
