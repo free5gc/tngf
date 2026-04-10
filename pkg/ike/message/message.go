@@ -409,7 +409,7 @@ func (securityAssociation *SecurityAssociation) unmarshal(rawData []byte) error 
 			if transformLength > 8 {
 				// Attribute parsing needs bytes [8:12], so one <12 check covers both <10 and <12 cases.
 				if transformLength < 12 {
-					return fmt.Errorf("malformed transform: insufficient attribute bytes, transformLength=%d", transformLength)
+					return fmt.Errorf("Transform: insufficient bytes for attribute fields, transformLength=%d", transformLength)
 				}
 
 				transform.AttributePresent = true
