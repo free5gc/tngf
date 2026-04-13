@@ -407,6 +407,11 @@ func (securityAssociation *SecurityAssociation) unmarshal(rawData []byte) error 
 			transform.TransformType = transformData[4]
 			transform.TransformID = binary.BigEndian.Uint16(transformData[6:8])
 			if transformLength > 8 {
+				// Attribute parsing needs bytes [8:12], so one <12 check covers both <10 and <12 cases.
+				if transformLength < 12 {
+					return fmt.Errorf("Transform: insufficient bytes for attribute fields, transformLength=%d", transformLength)
+				}
+
 				transform.AttributePresent = true
 				transform.AttributeFormat = ((transformData[8] & 0x80) >> 7)
 				transform.AttributeType = binary.BigEndian.Uint16(transformData[8:10]) & 0x7f
