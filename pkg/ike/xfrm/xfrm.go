@@ -16,6 +16,8 @@ import (
 // Log
 var ikeLog *logrus.Entry
 
+const defaultXFRMReplayWindow = 32
+
 func init() {
 	ikeLog = logger.IKELog
 }
@@ -103,6 +105,7 @@ func ApplyXFRMRule(tngf_is_initiator bool, xfrmiId uint32,
 	xfrmState.Auth = xfrmIntegrityAlgorithm
 	xfrmState.Crypt = xfrmEncryptionAlgorithm
 	xfrmState.ESN = childSecurityAssociation.ESN
+	xfrmState.ReplayWindow = defaultXFRMReplayWindow
 
 	if childSecurityAssociation.EnableEncapsulate {
 		xfrmState.Encap = &netlink.XfrmStateEncap{
