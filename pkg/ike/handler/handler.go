@@ -302,6 +302,7 @@ func HandleIKESAINIT(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, messag
 	}
 	ikeSecurityAssociation.RemoteSPI = message.InitiatorSPI
 	ikeSecurityAssociation.InitiatorMessageID = message.MessageID
+	ikeSecurityAssociation.PeerRequestMessageID = message.MessageID
 	ikeSecurityAssociation.UEIsBehindNAT = ueIsBehindNAT
 	ikeSecurityAssociation.TNGFIsBehindNAT = tngfIsBehindNAT
 
