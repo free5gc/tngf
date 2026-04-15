@@ -281,6 +281,7 @@ func HandleIKESAINIT(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, messag
 	ikeSecurityAssociation := tngfSelf.NewIKESecurityAssociation()
 	ikeSecurityAssociation.RemoteSPI = message.InitiatorSPI
 	ikeSecurityAssociation.InitiatorMessageID = message.MessageID
+	ikeSecurityAssociation.PeerRequestMessageID = message.MessageID
 	ikeSecurityAssociation.UEIsBehindNAT = ueIsBehindNAT
 	ikeSecurityAssociation.TNGFIsBehindNAT = tngfIsBehindNAT
 
@@ -1370,6 +1371,74 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 					temporaryPDUSessionSetupData.FailedListSURes, nil)
 			}
 			break
+		}
+	}
+}
+
+func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message *ike_message.IKEMessage) {
+	ikeLog.Infoln("Handle INFORMATIONAL")
+
+	if message == nil {
+		ikeLog.Error("IKE Message is nil")
+		return
+	}
+
+	ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(message.ResponderSPI)
+	if !ok {
+		ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: 0x%x", message.ResponderSPI)
+		return
+	}
+
+	var encryptedPayload *ike_message.Encrypted
+	for _, ikePayload := range message.Payloads {
+		switch ikePayload.Type() {
+		case ike_message.TypeSK:
+			encryptedPayload = ikePayload.(*ike_message.Encrypted)
+		default:
+			ikeLog.Warnf(
+				"Get IKE payload (type %d) in INFORMATIONAL message, this payload will not be handled by IKE handler",
+				ikePayload.Type())
+		}
+	}
+
+	if encryptedPayload == nil {
+		ikeLog.Warn("INFORMATIONAL message has no encrypted payload")
+		return
+	}
+
+	decryptedIKEPayload, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+	if err != nil {
+		ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
+		return
+	}
+
+	for _, ikePayload := range decryptedIKEPayload {
+		if ikePayload.Type() != ike_message.TypeD {
+			continue
+		}
+
+		deletePayload := ikePayload.(*ike_message.Delete)
+		switch deletePayload.ProtocolID {
+		case ike_message.TypeIKE:
+			ikeLog.Info("Received IKE SA DELETE")
+			if ikeSecurityAssociation.ThisUE != nil {
+				ikeSecurityAssociation.ThisUE.Remove()
+			} else {
+				context.TNGFSelf().DeleteIKESecurityAssociation(ikeSecurityAssociation.LocalSPI)
+			}
+		case ike_message.TypeESP:
+			if deletePayload.SPISize != 4 {
+				ikeLog.Warnf("Unexpected ESP SPI size in DELETE payload: %d", deletePayload.SPISize)
+				continue
+			}
+
+			for offset := 0; offset+4 <= len(deletePayload.SPIs); offset += 4 {
+				inboundSPI := binary.BigEndian.Uint32(deletePayload.SPIs[offset : offset+4])
+				context.TNGFSelf().ChildSA.Delete(inboundSPI)
+				if ikeSecurityAssociation.ThisUE != nil {
+					delete(ikeSecurityAssociation.ThisUE.TNGFChildSecurityAssociation, inboundSPI)
+				}
+			}
 		}
 	}
 }
