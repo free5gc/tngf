@@ -78,6 +78,11 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 		}
 	}
 
+	if len(eapMessage) != 0 && requestMessageAuthenticator == nil {
+		radiusLog.Errorln("Access-Request with EAP-Message but no Message-Authenticator")
+		return
+	}
+
 	var session *context.RadiusSession
 	session, ok := tngfSelf.RadiusSessionPoolLoad(callingStationId)
 	if !ok {
