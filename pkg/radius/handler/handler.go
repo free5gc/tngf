@@ -58,6 +58,10 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			eapMessage = radiusPayload.Val
 		case radius_message.TypeCalledStationId:
 			calledStationId = string(radiusPayload.Val)
+			if len(calledStationId) < 17 {
+				radiusLog.Errorln("CalledStationId too short:", len(calledStationId))
+				continue
+			}
 			calledStationId = strings.ReplaceAll(calledStationId[:17], "-", "")
 			tnapId, err = strconv.ParseUint(calledStationId, 16, 64)
 			if err != nil {
