@@ -280,6 +280,11 @@ func DecryptMessage(key []byte, cipherText []byte, algorithmType uint16) ([]byte
 		ikeLog.Tracef("Decrypted content:\n%s", hex.Dump(plainText))
 
 		padding := int(plainText[len(plainText)-1]) + 1
+		if padding > len(plainText) {
+			return nil, fmt.Errorf(
+				"ENCR_AES_CBC: invalid padding length %d exceeds plaintext length %d", padding, len(plainText),
+			)
+		}
 		plainText = plainText[:len(plainText)-padding]
 
 		ikeLog.Tracef("Decrypted content with out padding:\n%s", hex.Dump(plainText))
