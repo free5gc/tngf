@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"hash"
 	"io"
 	"math/big"
@@ -291,6 +292,9 @@ func DecryptMessage(key []byte, cipherText []byte, algorithmType uint16) ([]byte
 		}
 
 		padding := int(cipherText[len(cipherText)-1]) + 1
+		if padding > len(cipherText) {
+			return nil, fmt.Errorf("ENCR_NULL: invalid padding length %d exceeds data length %d", padding, len(cipherText))
+		}
 		plainText := cipherText[:len(cipherText)-padding]
 
 		return plainText, nil
