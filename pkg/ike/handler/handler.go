@@ -1142,6 +1142,16 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		return
 	}
 
+	if len(securityAssociation.Proposals) == 0 {
+		ikeLog.Warn("No proposal in CREATE_CHILD_SA response")
+		return
+	}
+
+	if len(securityAssociation.Proposals[0].SPI) < 4 {
+		ikeLog.Warnf("Invalid SPI length in CREATE_CHILD_SA response proposal: %d", len(securityAssociation.Proposals[0].SPI))
+		return
+	}
+
 	if trafficSelectorInitiator == nil {
 		ikeLog.Error("The traffic selector initiator field is nil")
 		return
