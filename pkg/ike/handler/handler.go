@@ -554,6 +554,10 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 					continue
 				}
 			} // Optional
+			if encryptionAlgorithmTransform.TransformID == ike_message.ENCR_NULL && integrityAlgorithmTransform == nil {
+				ikeLog.Warn("Reject Child SA proposal: ENCR_NULL without integrity")
+				continue
+			}
 			if len(proposal.DiffieHellmanGroup) > 0 {
 				for _, transform := range proposal.DiffieHellmanGroup {
 					if is_Kernel_Supported(ike_message.TypeDiffieHellmanGroup, transform.TransformID,
@@ -748,9 +752,11 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 			switch attribute.Type {
 			case ike_message.INTERNAL_IP4_ADDRESS:
 				addrRequest = true
-				if len(attribute.Value) != 0 {
+				if len(attribute.Value) >= 4 {
 					ikeLog.Tracef("Got client requested address: %d.%d.%d.%d",
 						attribute.Value[0], attribute.Value[1], attribute.Value[2], attribute.Value[3])
+				} else if len(attribute.Value) != 0 {
+					ikeLog.Warnf("Ignore malformed INTERNAL_IP4_ADDRESS attribute with short length: %d", len(attribute.Value))
 				}
 			default:
 				ikeLog.Warnf("Receive other type of configuration request: %d", attribute.Type)
@@ -1136,6 +1142,16 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		return
 	}
 
+	if len(securityAssociation.Proposals) == 0 {
+		ikeLog.Warn("No proposal in CREATE_CHILD_SA response")
+		return
+	}
+
+	if len(securityAssociation.Proposals[0].SPI) < 4 {
+		ikeLog.Warnf("Invalid SPI length in CREATE_CHILD_SA response proposal: %d", len(securityAssociation.Proposals[0].SPI))
+		return
+	}
+
 	if trafficSelectorInitiator == nil {
 		ikeLog.Error("The traffic selector initiator field is nil")
 		return
@@ -1421,7 +1437,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 	case ike_message.TypePseudorandomFunction:
 		switch transformID {
 		case ike_message.PRF_HMAC_MD5:
-			return true
+			return false
 		case ike_message.PRF_HMAC_SHA1:
 			return true
 		case ike_message.PRF_HMAC_TIGER:
@@ -1434,7 +1450,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 		case ike_message.AUTH_NONE:
 			return false
 		case ike_message.AUTH_HMAC_MD5_96:
-			return true
+			return false
 		case ike_message.AUTH_HMAC_SHA1_96:
 			return true
 		case ike_message.AUTH_DES_MAC:
@@ -1453,7 +1469,7 @@ func is_supported(transformType uint8, transformID uint16, attributePresent bool
 		case ike_message.DH_768_BIT_MODP:
 			return false
 		case ike_message.DH_1024_BIT_MODP:
-			return true
+			return false
 		case ike_message.DH_1536_BIT_MODP:
 			return false
 		case ike_message.DH_2048_BIT_MODP:
