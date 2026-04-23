@@ -147,6 +147,9 @@ type IKESecurityAssociation struct {
 	InitiatorMessageID uint32
 	ResponderMessageID uint32
 
+	// Message ID validation state
+	PeerRequestMessageID uint32
+
 	// Transforms for IKE SA
 	EncryptionAlgorithm    *ike_message.Transform
 	PseudorandomFunction   *ike_message.Transform

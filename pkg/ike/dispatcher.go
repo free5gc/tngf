@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/free5gc/tngf/internal/logger"
+	"github.com/free5gc/tngf/pkg/context"
 	"github.com/free5gc/tngf/pkg/ike/handler"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 )
@@ -15,6 +16,57 @@ var ikeLog *logrus.Entry
 
 func init() {
 	ikeLog = logger.IKELog
+}
+
+func isResponseMessage(ikeMessage *ike_message.IKEMessage) bool {
+	return (ikeMessage.Flags & ike_message.ResponseBitCheck) != 0
+}
+
+func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
+	if ikeMessage == nil || ikeMessage.ExchangeType == ike_message.IKE_SA_INIT {
+		return true
+	}
+
+	if isResponseMessage(ikeMessage) {
+		if ikeMessage.ExchangeType != ike_message.CREATE_CHILD_SA {
+			return true
+		}
+
+		ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI)
+		if !ok {
+			// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
+			return true
+		}
+
+		if ikeSecurityAssociation.ThisUE == nil {
+			ikeLog.Warn("Unexpected CREATE_CHILD_SA response: UE context is nil")
+			return false
+		}
+
+		if _, exists := ikeSecurityAssociation.ThisUE.TemporaryExchangeMsgIDChildSAMapping[ikeMessage.MessageID]; !exists {
+			ikeLog.Warnf(
+				"Unexpected CREATE_CHILD_SA response MessageID: got %d with no pending exchange",
+				ikeMessage.MessageID,
+			)
+			return false
+		}
+
+		return true
+	}
+
+	ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI)
+	if !ok {
+		// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
+		return true
+	}
+
+	expectedMessageID := ikeSecurityAssociation.PeerRequestMessageID + 1
+	if ikeMessage.MessageID != expectedMessageID {
+		ikeLog.Warnf("Unexpected request MessageID: got %d, expected %d", ikeMessage.MessageID, expectedMessageID)
+		return false
+	}
+	ikeSecurityAssociation.PeerRequestMessageID = ikeMessage.MessageID
+	return true
 }
 
 func Dispatch(udpConn *net.UDPConn, localAddr, remoteAddr *net.UDPAddr, msg []byte) {
@@ -52,6 +104,10 @@ func Dispatch(udpConn *net.UDPConn, localAddr, remoteAddr *net.UDPAddr, msg []by
 		return
 	}
 
+	if !validateAndTrackMessageID(ikeMessage) {
+		return
+	}
+
 	switch ikeMessage.ExchangeType {
 	case ike_message.IKE_SA_INIT:
 		handler.HandleIKESAINIT(udpConn, localAddr, remoteAddr, ikeMessage)
@@ -59,6 +115,8 @@ func Dispatch(udpConn *net.UDPConn, localAddr, remoteAddr *net.UDPAddr, msg []by
 		handler.HandleIKEAUTH(udpConn, localAddr, remoteAddr, ikeMessage)
 	case ike_message.CREATE_CHILD_SA:
 		handler.HandleCREATECHILDSA(udpConn, localAddr, remoteAddr, ikeMessage)
+	case ike_message.INFORMATIONAL:
+		handler.HandleInformational(udpConn, localAddr, remoteAddr, ikeMessage)
 	default:
 		ikeLog.Warnf("Unimplemented IKE message type, exchange type: %d", ikeMessage.ExchangeType)
 	}
