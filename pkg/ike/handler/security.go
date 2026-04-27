@@ -90,6 +90,9 @@ const (
 func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 	diffieHellmanGroupNumber uint16,
 ) (localPublicValue []byte, sharedKey []byte, err error) {
+	if secret == nil {
+		return nil, nil, errors.New("failed to generate DH secret")
+	}
 	peerPublicValueBig := new(big.Int).SetBytes(peerPublicValue)
 	var generator, factor *big.Int
 	var ok bool
