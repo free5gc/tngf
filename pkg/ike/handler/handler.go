@@ -209,9 +209,20 @@ func HandleIKESAINIT(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, messag
 		}
 
 		var localPublicValue []byte
+		var dhErr error
 
-		localPublicValue, sharedKeyData = CalculateDiffieHellmanMaterials(GenerateRandomNumber(),
+		localPublicValue, sharedKeyData, dhErr = CalculateDiffieHellmanMaterials(GenerateRandomNumber(),
 			keyExchange.KeyExchangeData, chosenDiffieHellmanGroup)
+		if dhErr != nil {
+			ikeLog.Warnf("Reject IKE_SA_INIT due to invalid peer Diffie-Hellman public value: %+v", dhErr)
+			responseIKEMessage.BuildIKEHeader(message.InitiatorSPI, message.ResponderSPI,
+				ike_message.IKE_SA_INIT, ike_message.ResponseBitCheck, message.MessageID)
+			responseIKEMessage.Payloads.Reset()
+			responseIKEMessage.Payloads.BuildNotification(
+				ike_message.TypeNone, ike_message.INVALID_SYNTAX, nil, nil)
+			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+			return
+		}
 		responseIKEMessage.Payloads.BUildKeyExchange(chosenDiffieHellmanGroup, localPublicValue)
 	} else {
 		ikeLog.Error("The key exchange field is nil")
