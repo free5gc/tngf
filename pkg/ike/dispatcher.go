@@ -22,6 +22,18 @@ func isResponseMessage(ikeMessage *ike_message.IKEMessage) bool {
 	return (ikeMessage.Flags & ike_message.ResponseBitCheck) != 0
 }
 
+func loadIKESAForMessageIDValidation(ikeMessage *ike_message.IKEMessage) (*context.IKESecurityAssociation, bool) {
+	if ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI); ok {
+		return ikeSecurityAssociation, true
+	}
+
+	// TNGF-initiated exchanges should normally retain the original IKE SA SPI
+	// ordering, but some existing CREATE_CHILD_SA paths build outbound headers
+	// with the local SPI in InitiatorSPI. Check both positions so response
+	// validation is not silently bypassed.
+	return context.TNGFSelf().IKESALoad(ikeMessage.InitiatorSPI)
+}
+
 func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 	if ikeMessage == nil || ikeMessage.ExchangeType == ike_message.IKE_SA_INIT {
 		return true
@@ -32,7 +44,7 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 			return true
 		}
 
-		ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI)
+		ikeSecurityAssociation, ok := loadIKESAForMessageIDValidation(ikeMessage)
 		if !ok {
 			// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
 			return true
@@ -54,7 +66,7 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 		return true
 	}
 
-	ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI)
+	ikeSecurityAssociation, ok := loadIKESAForMessageIDValidation(ikeMessage)
 	if !ok {
 		// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
 		return true
