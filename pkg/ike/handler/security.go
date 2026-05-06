@@ -90,7 +90,10 @@ const (
 
 func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 	diffieHellmanGroupNumber uint16,
-) (localPublicValue []byte, sharedKey []byte) {
+) (localPublicValue []byte, sharedKey []byte, err error) {
+	if secret == nil {
+		return nil, nil, errors.New("failed to generate DH secret")
+	}
 	peerPublicValueBig := new(big.Int).SetBytes(peerPublicValue)
 	var generator, factor *big.Int
 	var ok bool
@@ -103,6 +106,7 @@ func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 			ikeLog.Errorf(
 				"Error occurs when setting big number \"factor\" in %d group",
 				diffieHellmanGroupNumber)
+			return nil, nil, errors.New("failed to initialize DH group factor")
 		}
 	case message.DH_2048_BIT_MODP:
 		generator = new(big.Int).SetUint64(Group14Generator)
@@ -111,10 +115,17 @@ func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 			ikeLog.Errorf(
 				"Error occurs when setting big number \"factor\" in %d group",
 				diffieHellmanGroupNumber)
+			return nil, nil, errors.New("failed to initialize DH group factor")
 		}
 	default:
 		ikeLog.Errorf("Unsupported Diffie-Hellman group: %d", diffieHellmanGroupNumber)
-		return nil, nil
+		return nil, nil, errors.New("unsupported Diffie-Hellman group")
+	}
+
+	one := big.NewInt(1)
+	pMinusOne := new(big.Int).Sub(factor, one)
+	if peerPublicValueBig.Cmp(one) <= 0 || peerPublicValueBig.Cmp(pMinusOne) >= 0 {
+		return nil, nil, errors.New("invalid DH public value")
 	}
 
 	localPublicValue = new(big.Int).Exp(generator, secret, factor).Bytes()
@@ -125,7 +136,7 @@ func CalculateDiffieHellmanMaterials(secret *big.Int, peerPublicValue []byte,
 	prependZero = make([]byte, len(factor.Bytes())-len(sharedKey))
 	sharedKey = append(prependZero, sharedKey...)
 
-	return localPublicValue, sharedKey
+	return localPublicValue, sharedKey, nil
 }
 
 // Pseudorandom Function
