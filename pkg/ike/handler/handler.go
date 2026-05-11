@@ -1001,7 +1001,8 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 					continue
 				}
 
-				SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+				thisUE.CreateHalfChildSA(ikeSecurityAssociation.InitiatorMessageID, spi, pduSessionID)
+				SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, ikeMessage)
 				break
 			} else {
 				// Send Initial Context Setup Response to AMF
@@ -1356,7 +1357,8 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 				continue
 			}
 
-			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+			thisUE.CreateHalfChildSA(ikeSecurityAssociation.ResponderMessageID, spi, tmp_pduSessionID)
+			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, ikeMessage)
 			break
 		} else {
 			// Send Response to AMF
@@ -1411,6 +1413,19 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
 		return
 	}
+
+	responseIKEMessage := new(ike_message.IKEMessage)
+	responseIKEMessage.BuildIKEHeader(message.InitiatorSPI, message.ResponderSPI,
+		ike_message.INFORMATIONAL, ike_message.ResponseBitCheck, message.MessageID)
+	responseIKEMessage.Payloads.Reset()
+
+	var responseIKEPayload ike_message.IKEPayloadContainer
+	if encryptErr := EncryptProcedure(ikeSecurityAssociation, responseIKEPayload, responseIKEMessage); encryptErr != nil {
+		ikeLog.Errorf("Encrypt INFORMATIONAL response failed: %+v", encryptErr)
+		return
+	}
+
+	SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
 
 	for _, ikePayload := range decryptedIKEPayload {
 		if ikePayload.Type() != ike_message.TypeD {

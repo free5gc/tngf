@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/vishvananda/netlink"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
@@ -76,6 +77,7 @@ type TNGFUe struct {
 	// Exchange Message ID(including a SPI) and ChildSA(including a SPI)
 	// Mapping of Message ID of exchange in IKE and Child SA when creating new child SA
 	TemporaryExchangeMsgIDChildSAMapping map[uint32]*ChildSecurityAssociation // Message ID as a key
+	TemporaryExchangeMsgIDChildSAMu      sync.Mutex
 
 	/* NAS IKE Connection */
 	IKEConnection *UDPSocketInfo
@@ -149,6 +151,7 @@ type IKESecurityAssociation struct {
 
 	// Message ID validation state
 	PeerRequestMessageID uint32
+	MessageIDMu          sync.Mutex
 
 	// Transforms for IKE SA
 	EncryptionAlgorithm    *ike_message.Transform
@@ -285,6 +288,9 @@ func (ue *TNGFUe) CreatePDUSession(pduSessionID int64, snssai ngapType.SNSSAI) (
 // When TNGF send CREATE_CHILD_SA request to N3UE, the inbound SPI of childSA will be only stored first until
 // receive response and call CompleteChildSAWithProposal to fill the all data of childSA
 func (ue *TNGFUe) CreateHalfChildSA(msgID, inboundSPI uint32, pduSessionID int64) {
+	ue.TemporaryExchangeMsgIDChildSAMu.Lock()
+	defer ue.TemporaryExchangeMsgIDChildSAMu.Unlock()
+
 	childSA := new(ChildSecurityAssociation)
 	childSA.InboundSPI = inboundSPI
 	childSA.PDUSessionIds = append(childSA.PDUSessionIds, pduSessionID)
@@ -294,9 +300,20 @@ func (ue *TNGFUe) CreateHalfChildSA(msgID, inboundSPI uint32, pduSessionID int64
 	ue.TemporaryExchangeMsgIDChildSAMapping[msgID] = childSA
 }
 
+func (ue *TNGFUe) HasHalfChildSA(msgID uint32) bool {
+	ue.TemporaryExchangeMsgIDChildSAMu.Lock()
+	defer ue.TemporaryExchangeMsgIDChildSAMu.Unlock()
+
+	_, ok := ue.TemporaryExchangeMsgIDChildSAMapping[msgID]
+	return ok
+}
+
 func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 	chosenSecurityAssociation *ike_message.SecurityAssociation,
 ) (*ChildSecurityAssociation, error) {
+	ue.TemporaryExchangeMsgIDChildSAMu.Lock()
+	defer ue.TemporaryExchangeMsgIDChildSAMu.Unlock()
+
 	childSA, ok := ue.TemporaryExchangeMsgIDChildSAMapping[msgID]
 
 	if !ok {

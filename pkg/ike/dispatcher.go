@@ -55,7 +55,7 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 			return false
 		}
 
-		if _, exists := ikeSecurityAssociation.ThisUE.TemporaryExchangeMsgIDChildSAMapping[ikeMessage.MessageID]; !exists {
+		if !ikeSecurityAssociation.ThisUE.HasHalfChildSA(ikeMessage.MessageID) {
 			ikeLog.Warnf(
 				"Unexpected CREATE_CHILD_SA response MessageID: got %d with no pending exchange",
 				ikeMessage.MessageID,
@@ -69,6 +69,14 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 	ikeSecurityAssociation, ok := loadIKESAForMessageIDValidation(ikeMessage)
 	if !ok {
 		// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
+		return true
+	}
+
+	ikeSecurityAssociation.MessageIDMu.Lock()
+	defer ikeSecurityAssociation.MessageIDMu.Unlock()
+
+	if ikeMessage.MessageID == ikeSecurityAssociation.PeerRequestMessageID {
+		ikeLog.Debugf("Accepting retransmitted request MessageID: %d", ikeMessage.MessageID)
 		return true
 	}
 

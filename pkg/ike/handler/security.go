@@ -653,9 +653,6 @@ func EncryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation,
 	if ikeSecurityAssociation == nil {
 		return errors.New("IKE SA is nil")
 	}
-	if len(ikePayload) == 0 {
-		return errors.New("no IKE payload to be encrypted")
-	}
 	if responseIKEMessage == nil {
 		return errors.New("response IKE message is nil")
 	}
@@ -703,7 +700,11 @@ func EncryptProcedure(ikeSecurityAssociation *context.IKESecurityAssociation,
 	}
 
 	encryptedData = append(encryptedData, make([]byte, checksumLength)...)
-	sk := responseIKEMessage.Payloads.BuildEncrypted(ikePayload[0].Type(), encryptedData)
+	nextPayload := message.IKEPayloadType(message.NoNext)
+	if len(ikePayload) > 0 {
+		nextPayload = ikePayload[0].Type()
+	}
+	sk := responseIKEMessage.Payloads.BuildEncrypted(nextPayload, encryptedData)
 
 	// Calculate checksum
 	responseIKEMessageData, err := responseIKEMessage.Encode()
