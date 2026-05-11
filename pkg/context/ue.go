@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/vishvananda/netlink"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
@@ -139,6 +140,8 @@ type GTPConnectionInfo struct {
 }
 
 type IKESecurityAssociation struct {
+	CreatedAt time.Time
+
 	// SPI
 	RemoteSPI uint64
 	LocalSPI  uint64
