@@ -1028,7 +1028,8 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 					continue
 				}
 
-				SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+				thisUE.CreateHalfChildSA(ikeSecurityAssociation.InitiatorMessageID, spi, pduSessionID)
+				SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, ikeMessage)
 				break
 			} else {
 				// Send Initial Context Setup Response to AMF
@@ -1393,7 +1394,8 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 				continue
 			}
 
-			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+			thisUE.CreateHalfChildSA(ikeSecurityAssociation.ResponderMessageID, spi, tmp_pduSessionID)
+			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, ikeMessage)
 			break
 		} else {
 			// Send Response to AMF
@@ -1429,6 +1431,24 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		return
 	}
 
+	// RFC 7296 §2.21: every INFORMATIONAL request must receive an empty INFORMATIONAL response.
+	// Send it before processing delete payloads below, since a Delete(IKE) payload can tear down
+	// this ikeSecurityAssociation.
+	responseIKEMessage := new(ike_message.IKEMessage)
+	var responseIKEPayload ike_message.IKEPayloadContainer
+	responseIKEMessage.BuildIKEHeader(
+		ikeSecurityAssociation.RemoteSPI,
+		ikeSecurityAssociation.LocalSPI,
+		ike_message.INFORMATIONAL,
+		ike_message.ResponseBitCheck,
+		message.MessageID,
+	)
+	if err := EncryptProcedure(ikeSecurityAssociation, responseIKEPayload, responseIKEMessage); err != nil {
+		ikeLog.Errorf("Encrypting INFORMATIONAL response failed: %+v", err)
+		return
+	}
+	SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+
 	for _, payload := range message.Payloads {
 		if encryptedPayload, isEncrypted := payload.(*ike_message.Encrypted); isEncrypted {
 			decryptedPayloads, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
@@ -1452,22 +1472,6 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		}
 		handleInformationalDeletePayload(tngfSelf, ikeSecurityAssociation, deletePayload)
 	}
-
-	// RFC 7296 §2.21: every INFORMATIONAL request must receive an empty INFORMATIONAL response
-	responseIKEMessage := new(ike_message.IKEMessage)
-	var responseIKEPayload ike_message.IKEPayloadContainer
-	responseIKEMessage.BuildIKEHeader(
-		ikeSecurityAssociation.RemoteSPI,
-		ikeSecurityAssociation.LocalSPI,
-		ike_message.INFORMATIONAL,
-		ike_message.ResponseBitCheck,
-		message.MessageID,
-	)
-	if err := EncryptProcedure(ikeSecurityAssociation, responseIKEPayload, responseIKEMessage); err != nil {
-		ikeLog.Errorf("Encrypting INFORMATIONAL response failed: %+v", err)
-		return
-	}
-	SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
 }
 
 func handleInformationalDeletePayload(
