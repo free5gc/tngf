@@ -1,14 +1,14 @@
 module github.com/free5gc/tngf
 
-go 1.25.5
+go 1.26.2
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/free5gc/aper v1.1.0
-	github.com/free5gc/nas v1.2.2
-	github.com/free5gc/ngap v1.1.2
-	github.com/free5gc/sctp v1.1.1
-	github.com/free5gc/util v1.3.1
+	github.com/free5gc/aper v1.1.1
+	github.com/free5gc/nas v1.2.3
+	github.com/free5gc/ngap v1.1.3
+	github.com/free5gc/sctp v1.1.2
+	github.com/free5gc/util v1.3.2
 	github.com/prometheus/client_golang v1.21.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.7
@@ -27,7 +27,7 @@ require (
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
-	github.com/free5gc/openapi v1.2.3 // indirect
+	github.com/free5gc/openapi v1.2.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.10.0 // indirect
