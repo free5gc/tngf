@@ -22,6 +22,14 @@ func isResponseMessage(ikeMessage *ike_message.IKEMessage) bool {
 	return (ikeMessage.Flags & ike_message.ResponseBitCheck) != 0
 }
 
+type messageIDValidationResult int
+
+const (
+	messageIDValidationProcess messageIDValidationResult = iota
+	messageIDValidationDrop
+	messageIDValidationRetransmit
+)
+
 func loadIKESAForMessageIDValidation(ikeMessage *ike_message.IKEMessage) (*context.IKESecurityAssociation, bool) {
 	if ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(ikeMessage.ResponderSPI); ok {
 		return ikeSecurityAssociation, true
@@ -34,25 +42,25 @@ func loadIKESAForMessageIDValidation(ikeMessage *ike_message.IKEMessage) (*conte
 	return context.TNGFSelf().IKESALoad(ikeMessage.InitiatorSPI)
 }
 
-func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
+func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) messageIDValidationResult {
 	if ikeMessage == nil || ikeMessage.ExchangeType == ike_message.IKE_SA_INIT {
-		return true
+		return messageIDValidationProcess
 	}
 
 	if isResponseMessage(ikeMessage) {
 		if ikeMessage.ExchangeType != ike_message.CREATE_CHILD_SA {
-			return true
+			return messageIDValidationProcess
 		}
 
 		ikeSecurityAssociation, ok := loadIKESAForMessageIDValidation(ikeMessage)
 		if !ok {
 			// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
-			return true
+			return messageIDValidationProcess
 		}
 
 		if ikeSecurityAssociation.ThisUE == nil {
 			ikeLog.Warn("Unexpected CREATE_CHILD_SA response: UE context is nil")
-			return false
+			return messageIDValidationDrop
 		}
 
 		if !ikeSecurityAssociation.ThisUE.HasHalfChildSA(ikeMessage.MessageID) {
@@ -60,33 +68,34 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) bool {
 				"Unexpected CREATE_CHILD_SA response MessageID: got %d with no pending exchange",
 				ikeMessage.MessageID,
 			)
-			return false
+			return messageIDValidationDrop
 		}
 
-		return true
+		return messageIDValidationProcess
 	}
 
 	ikeSecurityAssociation, ok := loadIKESAForMessageIDValidation(ikeMessage)
 	if !ok {
 		// Let handlers process unknown SPI and emit their existing INVALID_IKE_SPI behavior.
-		return true
+		return messageIDValidationProcess
 	}
 
 	ikeSecurityAssociation.MessageIDMu.Lock()
 	defer ikeSecurityAssociation.MessageIDMu.Unlock()
 
 	if ikeMessage.MessageID == ikeSecurityAssociation.PeerRequestMessageID {
-		ikeLog.Debugf("Accepting retransmitted request MessageID: %d", ikeMessage.MessageID)
-		return true
+		ikeLog.Debugf("Retransmitting response for request MessageID: %d", ikeMessage.MessageID)
+		return messageIDValidationRetransmit
 	}
 
 	expectedMessageID := ikeSecurityAssociation.PeerRequestMessageID + 1
 	if ikeMessage.MessageID != expectedMessageID {
 		ikeLog.Warnf("Unexpected request MessageID: got %d, expected %d", ikeMessage.MessageID, expectedMessageID)
-		return false
+		return messageIDValidationDrop
 	}
 	ikeSecurityAssociation.PeerRequestMessageID = ikeMessage.MessageID
-	return true
+	handler.ForgetCachedIKEResponsesBefore(ikeMessage.ResponderSPI, ikeMessage.MessageID)
+	return messageIDValidationProcess
 }
 
 func Dispatch(udpConn *net.UDPConn, localAddr, remoteAddr *net.UDPAddr, msg []byte) {
@@ -119,7 +128,15 @@ func Dispatch(udpConn *net.UDPConn, localAddr, remoteAddr *net.UDPAddr, msg []by
 		return
 	}
 
-	if !validateAndTrackMessageID(ikeMessage) {
+	switch validateAndTrackMessageID(ikeMessage) {
+	case messageIDValidationDrop:
+		return
+	case messageIDValidationRetransmit:
+		if !handler.RetransmitCachedIKEMessageToUE(
+			udpConn, localAddr, remoteAddr, ikeMessage.ResponderSPI, ikeMessage.MessageID,
+		) {
+			ikeLog.Warnf("No cached response for retransmitted request MessageID: %d", ikeMessage.MessageID)
+		}
 		return
 	}
 
