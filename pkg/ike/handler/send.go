@@ -19,8 +19,10 @@ type cachedResponse struct {
 	expiresAt time.Time
 }
 
-const cachedResponseLifetime = 5 * time.Minute
-const cachedResponseCleanupInterval = time.Minute
+const (
+	cachedResponseLifetime        = 5 * time.Minute
+	cachedResponseCleanupInterval = time.Minute
+)
 
 var cachedResponses sync.Map
 
