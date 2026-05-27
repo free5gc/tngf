@@ -94,8 +94,6 @@ func validateAndTrackMessageID(ikeMessage *ike_message.IKEMessage) messageIDVali
 		ikeLog.Warnf("Unexpected request MessageID: got %d, expected %d", ikeMessage.MessageID, expectedMessageID)
 		return messageIDValidationDrop
 	}
-	ikeSecurityAssociation.PeerRequestMessageID = ikeMessage.MessageID
-	handler.ForgetCachedIKEResponsesBefore(ikeMessage.ResponderSPI, ikeMessage.MessageID)
 	return messageIDValidationProcess
 }
 

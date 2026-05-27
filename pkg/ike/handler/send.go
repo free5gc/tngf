@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/free5gc/tngf/pkg/context"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 )
 
@@ -19,8 +20,20 @@ type cachedResponse struct {
 }
 
 const cachedResponseLifetime = 5 * time.Minute
+const cachedResponseCleanupInterval = time.Minute
 
 var cachedResponses sync.Map
+
+func init() {
+	go func() {
+		ticker := time.NewTicker(cachedResponseCleanupInterval)
+		defer ticker.Stop()
+
+		for now := range ticker.C {
+			cleanupExpiredCachedResponses(now)
+		}
+	}()
+}
 
 func cacheIKEMessageResponse(message *ike_message.IKEMessage, packet []byte) {
 	if message == nil || message.ExchangeType == ike_message.IKE_SA_INIT ||
@@ -84,6 +97,29 @@ func ForgetCachedIKEResponsesBefore(responderSPI uint64, messageID uint32) {
 	})
 }
 
+func markPeerRequestMessageIDProcessed(message *ike_message.IKEMessage) {
+	if message == nil || message.ExchangeType == ike_message.IKE_SA_INIT ||
+		(message.Flags&ike_message.ResponseBitCheck) == 0 {
+		return
+	}
+
+	ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(message.ResponderSPI)
+	if !ok {
+		return
+	}
+
+	ikeSecurityAssociation.MessageIDMu.Lock()
+	defer ikeSecurityAssociation.MessageIDMu.Unlock()
+
+	expectedMessageID := ikeSecurityAssociation.PeerRequestMessageID + 1
+	if message.MessageID != expectedMessageID {
+		return
+	}
+
+	ikeSecurityAssociation.PeerRequestMessageID = message.MessageID
+	ForgetCachedIKEResponsesBefore(message.ResponderSPI, message.MessageID)
+}
+
 func RetransmitCachedIKEMessageToUE(
 	udpConn *net.UDPConn,
 	_ *net.UDPAddr,
@@ -120,5 +156,6 @@ func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, mes
 	pkt = buildIKEPacketForUDP(srcAddr, pkt)
 	cleanupExpiredCachedResponses(time.Now())
 	cacheIKEMessageResponse(message, pkt)
+	markPeerRequestMessageIDProcessed(message)
 	sendIKEPacketToUE(udpConn, dstAddr, pkt)
 }

@@ -20,6 +20,8 @@ const (
 	AmfUeNgapIdUnspecified int64 = 0xffffffffff
 )
 
+const pendingChildSALifetime = 5 * time.Minute
+
 type RadiusSession struct {
 	CallingStationID string
 	State            uint8
@@ -79,8 +81,9 @@ type TNGFUe struct {
 	/* Temporary Mapping of two SPIs */
 	// Exchange Message ID(including a SPI) and ChildSA(including a SPI)
 	// Mapping of Message ID of exchange in IKE and Child SA when creating new child SA
-	TemporaryExchangeMsgIDChildSAMapping map[uint32]*ChildSecurityAssociation // Message ID as a key
-	TemporaryExchangeMsgIDChildSAMu      sync.Mutex
+	TemporaryExchangeMsgIDChildSAMapping   map[uint32]*ChildSecurityAssociation // Message ID as a key
+	TemporaryExchangeMsgIDChildSAExpiresAt map[uint32]time.Time
+	TemporaryExchangeMsgIDChildSAMu        sync.Mutex
 
 	/* NAS IKE Connection */
 	IKEConnection *UDPSocketInfo
@@ -254,6 +257,7 @@ func (ue *TNGFUe) init(ranUeNgapId int64) {
 	ue.PduSessionList = make(map[int64]*PDUSession)
 	ue.TNGFChildSecurityAssociation = make(map[uint32]*ChildSecurityAssociation)
 	ue.TemporaryExchangeMsgIDChildSAMapping = make(map[uint32]*ChildSecurityAssociation)
+	ue.TemporaryExchangeMsgIDChildSAExpiresAt = make(map[uint32]time.Time)
 }
 
 func (ue *TNGFUe) Remove() {
@@ -295,6 +299,13 @@ func (ue *TNGFUe) CreatePDUSession(pduSessionID int64, snssai ngapType.SNSSAI) (
 func (ue *TNGFUe) CreateHalfChildSA(msgID, inboundSPI uint32, pduSessionID int64) {
 	ue.TemporaryExchangeMsgIDChildSAMu.Lock()
 	defer ue.TemporaryExchangeMsgIDChildSAMu.Unlock()
+	if ue.TemporaryExchangeMsgIDChildSAMapping == nil {
+		ue.TemporaryExchangeMsgIDChildSAMapping = make(map[uint32]*ChildSecurityAssociation)
+	}
+	if ue.TemporaryExchangeMsgIDChildSAExpiresAt == nil {
+		ue.TemporaryExchangeMsgIDChildSAExpiresAt = make(map[uint32]time.Time)
+	}
+	ue.cleanupExpiredHalfChildSA(time.Now())
 
 	childSA := new(ChildSecurityAssociation)
 	childSA.InboundSPI = inboundSPI
@@ -303,14 +314,25 @@ func (ue *TNGFUe) CreateHalfChildSA(msgID, inboundSPI uint32, pduSessionID int64
 	childSA.ThisUE = ue
 	// Map Exchange Message ID and Child SA data until get paired response
 	ue.TemporaryExchangeMsgIDChildSAMapping[msgID] = childSA
+	ue.TemporaryExchangeMsgIDChildSAExpiresAt[msgID] = time.Now().Add(pendingChildSALifetime)
 }
 
 func (ue *TNGFUe) HasHalfChildSA(msgID uint32) bool {
 	ue.TemporaryExchangeMsgIDChildSAMu.Lock()
 	defer ue.TemporaryExchangeMsgIDChildSAMu.Unlock()
+	ue.cleanupExpiredHalfChildSA(time.Now())
 
 	_, ok := ue.TemporaryExchangeMsgIDChildSAMapping[msgID]
 	return ok
+}
+
+func (ue *TNGFUe) cleanupExpiredHalfChildSA(now time.Time) {
+	for msgID, expiresAt := range ue.TemporaryExchangeMsgIDChildSAExpiresAt {
+		if now.After(expiresAt) {
+			delete(ue.TemporaryExchangeMsgIDChildSAMapping, msgID)
+			delete(ue.TemporaryExchangeMsgIDChildSAExpiresAt, msgID)
+		}
+	}
 }
 
 func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
@@ -325,8 +347,16 @@ func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 		return nil, fmt.Errorf("there's not a half child SA created by the exchange with message ID %d", msgID)
 	}
 
+	expiresAt, hasExpiry := ue.TemporaryExchangeMsgIDChildSAExpiresAt[msgID]
+	if hasExpiry && time.Now().After(expiresAt) {
+		delete(ue.TemporaryExchangeMsgIDChildSAMapping, msgID)
+		delete(ue.TemporaryExchangeMsgIDChildSAExpiresAt, msgID)
+		return nil, fmt.Errorf("half child SA for message ID %d expired", msgID)
+	}
+
 	// Remove mapping of exchange msg ID and child SA
 	delete(ue.TemporaryExchangeMsgIDChildSAMapping, msgID)
+	delete(ue.TemporaryExchangeMsgIDChildSAExpiresAt, msgID)
 
 	if chosenSecurityAssociation == nil {
 		return nil, errors.New("chosenSecurityAssociation is nil")
