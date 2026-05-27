@@ -1428,6 +1428,14 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
 	if !ok {
 		ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: responder=0x%x", message.ResponderSPI)
+		if (message.Flags & ike_message.ResponseBitCheck) == 0 {
+			responseIKEMessage := new(ike_message.IKEMessage)
+			responseIKEMessage.BuildIKEHeader(message.InitiatorSPI, 0,
+				ike_message.INFORMATIONAL, ike_message.ResponseBitCheck, message.MessageID)
+			responseIKEMessage.Payloads.Reset()
+			responseIKEMessage.Payloads.BuildNotification(ike_message.TypeNone, ike_message.INVALID_IKE_SPI, nil, nil)
+			SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+		}
 		return
 	}
 

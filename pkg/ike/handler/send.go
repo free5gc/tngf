@@ -42,6 +42,9 @@ func cacheIKEMessageResponse(message *ike_message.IKEMessage, packet []byte) {
 		(message.Flags&ike_message.ResponseBitCheck) == 0 {
 		return
 	}
+	if _, ok := context.TNGFSelf().IKESALoad(message.ResponderSPI); !ok {
+		return
+	}
 
 	key := cachedResponseKey{
 		responderSPI: message.ResponderSPI,
