@@ -44,7 +44,7 @@ type TNGFContext struct {
 	UePool                 sync.Map // map[int64]*TNGFUe, RanUeNgapID as key
 	AMFPool                sync.Map // map[string]*TNGFAMF, SCTPAddr as key
 	AMFReInitAvailableList sync.Map // map[string]bool, SCTPAddr as key
-	IKESA                  sync.Map    // map[uint64]*IKESecurityAssociation, SPI as key
+	IKESA                  sync.Map // map[uint64]*IKESecurityAssociation, SPI as key
 	ikeSACount             atomic.Int64
 	ChildSA                sync.Map // map[uint32]*ChildSecurityAssociation, inboundSPI as key
 	GTPConnectionWithUPF   sync.Map // map[string]*gtpv1.UPlaneConn, UPF address as key
