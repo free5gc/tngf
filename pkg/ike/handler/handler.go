@@ -660,7 +660,6 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 	// Load needed information
 	thisUE := tngfSelf.UELoadbyIDi(initiatorID.IDData)
 	fmt.Println("initiatorID.IDData: ", string(initiatorID.IDData))
-	ikeSecurityAssociation.ThisUE = thisUE
 	if thisUE == nil {
 		ikeLog.Errorln("UE is nil")
 		return
@@ -905,6 +904,7 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 
 	// Store SA into tngfUE
 	thisUE.TNGFIKESecurityAssociation = ikeSecurityAssociation
+	ikeSecurityAssociation.ThisUE.Store(thisUE)
 
 	// Store IKE Connection
 	UDPSocket := context.UDPSocketInfo{
@@ -1118,7 +1118,7 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	ikeSecurityAssociation.ResponderMessageID = message.MessageID
 
 	// UE context
-	thisUE := ikeSecurityAssociation.ThisUE
+	thisUE := ikeSecurityAssociation.ThisUE.Load()
 	if thisUE == nil {
 		ikeLog.Error("UE context is nil")
 		return
@@ -1424,6 +1424,22 @@ func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		}
 		handleInformationalDeletePayload(tngfSelf, ikeSecurityAssociation, deletePayload)
 	}
+
+	// RFC 7296 §2.21: every INFORMATIONAL request must receive an empty INFORMATIONAL response
+	responseIKEMessage := new(ike_message.IKEMessage)
+	var responseIKEPayload ike_message.IKEPayloadContainer
+	responseIKEMessage.BuildIKEHeader(
+		ikeSecurityAssociation.RemoteSPI,
+		ikeSecurityAssociation.LocalSPI,
+		ike_message.INFORMATIONAL,
+		ike_message.ResponseBitCheck,
+		message.MessageID,
+	)
+	if err := EncryptProcedure(ikeSecurityAssociation, responseIKEPayload, responseIKEMessage); err != nil {
+		ikeLog.Errorf("Encrypting INFORMATIONAL response failed: %+v", err)
+		return
+	}
+	SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
 }
 
 func handleInformationalDeletePayload(
@@ -1445,12 +1461,18 @@ func handleInformationalDeletePayload(
 
 			spi := binary.BigEndian.Uint32(deletePayload.SPIs[offset : offset+4])
 			tngfSelf.ChildSA.Delete(spi)
-			if ikeSecurityAssociation.ThisUE != nil {
-				delete(ikeSecurityAssociation.ThisUE.TNGFChildSecurityAssociation, spi)
+			if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil {
+				ue.ChildSAMu.Lock()
+				delete(ue.TNGFChildSecurityAssociation, spi)
+				ue.ChildSAMu.Unlock()
 			}
 		}
 	case ike_message.TypeIKE:
-		tngfSelf.DeleteIKESecurityAssociation(ikeSecurityAssociation.LocalSPI)
+		if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil && ue.TNGFIKESecurityAssociation != nil {
+			ue.Remove()
+		} else {
+			tngfSelf.DeleteIKESecurityAssociation(ikeSecurityAssociation.LocalSPI)
+		}
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -67,6 +69,7 @@ type TNGFUe struct {
 
 	/* IKE Security Association */
 	TNGFIKESecurityAssociation   *IKESecurityAssociation
+	ChildSAMu                    sync.RWMutex
 	TNGFChildSecurityAssociation map[uint32]*ChildSecurityAssociation // inbound SPI as key
 	SignallingIPsecSAEstablished bool
 
@@ -192,8 +195,8 @@ type IKESecurityAssociation struct {
 	// If TNGFIsBehindNAT == true, TNGF should send UDP keepalive periodically
 	TNGFIsBehindNAT bool
 
-	// UE context
-	ThisUE *TNGFUe
+	// UE context — atomic to allow race-free read from cleanup goroutine
+	ThisUE atomic.Pointer[TNGFUe]
 }
 
 type ChildSecurityAssociation struct {
@@ -331,7 +334,9 @@ func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 	}
 
 	// Record to UE context with inbound SPI as key
+	ue.ChildSAMu.Lock()
 	ue.TNGFChildSecurityAssociation[childSA.InboundSPI] = childSA
+	ue.ChildSAMu.Unlock()
 	// Record to TNGF context with inbound SPI as key
 	tngfContext.ChildSA.Store(childSA.InboundSPI, childSA)
 

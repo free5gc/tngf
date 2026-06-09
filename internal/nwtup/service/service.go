@@ -104,6 +104,7 @@ func forward(ueInnerIP string, ifIndex int, rawData []byte) {
 
 	var pduSession *tngf_context.PDUSession
 
+	ue.ChildSAMu.RLock()
 	for _, childSA := range ue.TNGFChildSecurityAssociation {
 		// Check which child SA the packet come from with interface index,
 		// and find the corresponding PDU session
@@ -111,6 +112,7 @@ func forward(ueInnerIP string, ifIndex int, rawData []byte) {
 			pduSession = ue.PduSessionList[childSA.PDUSessionIds[0]]
 		}
 	}
+	ue.ChildSAMu.RUnlock()
 
 	if pduSession == nil {
 		nwtupLog.Error("This UE doesn't have any available PDU session")
