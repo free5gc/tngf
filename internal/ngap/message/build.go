@@ -3,152 +3,49 @@ package message
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"net"
 
-	"github.com/free5gc/aper"
-	"github.com/free5gc/ngap"
-	"github.com/free5gc/ngap/ngapConvert"
-	"github.com/free5gc/ngap/ngapType"
-	"github.com/free5gc/tngf/internal/logger"
+	"github.com/free5gc/ngap/aper"
+	"github.com/free5gc/ngap/ie"
+	ngapMessage "github.com/free5gc/ngap/message"
 	"github.com/free5gc/tngf/internal/util"
 	"github.com/free5gc/tngf/pkg/context"
 )
 
+var errBuilderNotImplemented = errors.New("NGAP message builder is not implemented")
+
 func BuildNGSetupRequest() ([]byte, error) {
 	tngfSelf := context.TNGFSelf()
-	var pdu ngapType.NGAPPDU
-	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
-	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
-
-	initiatingMessage := pdu.InitiatingMessage
-	initiatingMessage.ProcedureCode.Value = ngapType.ProcedureCodeNGSetup
-	initiatingMessage.Criticality.Value = ngapType.CriticalityPresentReject
-
-	initiatingMessage.Value.Present = ngapType.InitiatingMessagePresentNGSetupRequest
-	initiatingMessage.Value.NGSetupRequest = new(ngapType.NGSetupRequest)
-
-	nGSetupRequest := initiatingMessage.Value.NGSetupRequest
-	nGSetupRequestIEs := &nGSetupRequest.ProtocolIEs
-
-	// GlobalRANNodeID
-	ie := ngapType.NGSetupRequestIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDGlobalRANNodeID
-	ie.Criticality.Value = ngapType.CriticalityPresentReject
-	ie.Value.Present = ngapType.NGSetupRequestIEsPresentGlobalRANNodeID
-	ie.Value.GlobalRANNodeID = new(ngapType.GlobalRANNodeID)
-
-	globalRANNodeID := ie.Value.GlobalRANNodeID
-	globalRANNodeID.Present = ngapType.GlobalRANNodeIDPresentChoiceExtensions
-	globalRANNodeID.ChoiceExtensions = new(ngapType.ProtocolIESingleContainerGlobalRANNodeIDExtIEs)
-
-	choiceExtensions := globalRANNodeID.ChoiceExtensions
-	choiceExtensions.GlobalRANNodeIDExtIEs = new(ngapType.GlobalRANNodeIDExtIEs)
-
-	globalRANNodeIDExtIEs := choiceExtensions.GlobalRANNodeIDExtIEs
-	globalRANNodeIDExtIEs.Id.Value = ngapType.ProtocolIEIDGlobalTNGFID
-	globalRANNodeIDExtIEs.Criticality.Value = ngapType.CriticalityPresentReject
-
-	globalRANNodeIDExtIEsValue := new(ngapType.GlobalRANNodeIDExtIEsValue)
-	globalRANNodeIDExtIEsValue.Present = ngapType.GlobalRANNodeIDExtIEsPresentGlobalTNGFID
-	globalRANNodeIDExtIEsValue.GlobalTNGFID = new(ngapType.GlobalTNGFID)
-
-	globalTNGFID := globalRANNodeIDExtIEsValue.GlobalTNGFID
-	globalTNGFID.PLMNIdentity = util.PlmnIdToNgap(tngfSelf.NFInfo.GlobalTNGFID.PLMNID)
-	globalTNGFID.TNGFID.Present = ngapType.TNGFIDPresentTNGFID
-	globalTNGFID.TNGFID.TNGFID = util.TngfIdToNgap(tngfSelf.NFInfo.GlobalTNGFID.TNGFID)
-
-	globalRANNodeIDExtIEs.Value = *globalRANNodeIDExtIEsValue
-	nGSetupRequestIEs.List = append(nGSetupRequestIEs.List, ie)
-
-	// RANNodeName
-	ie = ngapType.NGSetupRequestIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDRANNodeName
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.NGSetupRequestIEsPresentRANNodeName
-	ie.Value.RANNodeName = new(ngapType.RANNodeName)
-
-	rANNodeName := ie.Value.RANNodeName
-	rANNodeName.Value = tngfSelf.NFInfo.RanNodeName
-	nGSetupRequestIEs.List = append(nGSetupRequestIEs.List, ie)
-	// SupportedTAList
-	ie = ngapType.NGSetupRequestIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDSupportedTAList
-	ie.Criticality.Value = ngapType.CriticalityPresentReject
-	ie.Value.Present = ngapType.NGSetupRequestIEsPresentSupportedTAList
-	ie.Value.SupportedTAList = new(ngapType.SupportedTAList)
-
-	supportedTAList := ie.Value.SupportedTAList
-
-	for _, supportedTAItemLocal := range tngfSelf.NFInfo.SupportedTAList {
-		// SupportedTAItem in SupportedTAList
-		supportedTAItem := ngapType.SupportedTAItem{}
-		var err error
-		supportedTAItem.TAC.Value, err = hex.DecodeString(supportedTAItemLocal.TAC)
-		if err != nil {
-			logger.NgapLog.Errorf("DecodeString error: %+v", err)
-		}
-
-		broadcastPLMNList := &supportedTAItem.BroadcastPLMNList
-
-		for _, broadcastPLMNListLocal := range supportedTAItemLocal.BroadcastPLMNList {
-			// BroadcastPLMNItem in BroadcastPLMNList
-			broadcastPLMNItem := ngapType.BroadcastPLMNItem{}
-			broadcastPLMNItem.PLMNIdentity = util.PlmnIdToNgap(broadcastPLMNListLocal.PLMNID)
-
-			sliceSupportList := &broadcastPLMNItem.TAISliceSupportList
-
-			for _, sliceSupportItemLocal := range broadcastPLMNListLocal.TAISliceSupportList {
-				// SliceSupportItem in SliceSupportList
-				sliceSupportItem := ngapType.SliceSupportItem{}
-				sliceSupportItem.SNSSAI.SST.Value, err = hex.DecodeString(sliceSupportItemLocal.SNSSAI.SST)
-				if err != nil {
-					logger.NgapLog.Errorf("DecodeString error: %+v", err)
-				}
-
-				if sliceSupportItemLocal.SNSSAI.SD != "" {
-					sliceSupportItem.SNSSAI.SD = new(ngapType.SD)
-					sliceSupportItem.SNSSAI.SD.Value, err = hex.DecodeString(sliceSupportItemLocal.SNSSAI.SD)
-					if err != nil {
-						logger.NgapLog.Errorf("DecodeString error: %+v", err)
-					}
-				}
-
-				sliceSupportList.List = append(sliceSupportList.List, sliceSupportItem)
-			}
-
-			broadcastPLMNList.List = append(broadcastPLMNList.List, broadcastPLMNItem)
-		}
-
-		supportedTAList.List = append(supportedTAList.List, supportedTAItem)
+	supportedTAList, err := buildSupportedTAList(tngfSelf.NFInfo.SupportedTAList)
+	if err != nil {
+		return nil, err
 	}
 
-	nGSetupRequestIEs.List = append(nGSetupRequestIEs.List, ie)
+	plmn := util.PlmnIdToNgap(tngfSelf.NFInfo.GlobalTNGFID.PLMNID)
+	globalRANNodeID := &ie.GlobalRANNodeID{
+		Choice: &ie.ProtocolIESingleContainerGlobalRANNodeIDExtIEs{
+			GlobalRANNodeIDExtIEs: ie.GlobalRANNodeIDExtIEs{
+				GlobalTNGFID: &ie.GlobalTNGFID{
+					PLMNIdentity: &plmn,
+					TNGFID: &ie.TNGFID{
+						Choice: &ie.TNGFIDForTNGFID{Value: *util.TngfIdToNgap(tngfSelf.NFInfo.GlobalTNGFID.TNGFID)},
+					},
+				},
+			},
+		},
+	}
 
-	/*
-		* The reason PagingDRX ie was commented is that in TS23.501
-		* PagingDRX was mentioned to be used only for 3GPP access.
-		* However, the question that if the paging function for TNGF
-		* is needed requires verification.
-
-			// PagingDRX
-			ie = ngapType.NGSetupRequestIEs{}
-			ie.Id.Value = ngapType.ProtocolIEIDDefaultPagingDRX
-			ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-			ie.Value.Present = ngapType.NGSetupRequestIEsPresentDefaultPagingDRX
-			ie.Value.DefaultPagingDRX = new(ngapType.PagingDRX)
-
-			pagingDRX := ie.Value.DefaultPagingDRX
-			pagingDRX.Value = ngapType.PagingDRXPresentV128
-			nGSetupRequestIEs.List = append(nGSetupRequestIEs.List, ie)
-	*/
-
-	return ngap.Encoder(pdu)
+	return (&ngapMessage.NGSetupRequest{
+		GlobalRANNodeID:  globalRANNodeID,
+		RANNodeName:      &ie.RANNodeName{Value: aper.PrintableString(tngfSelf.NFInfo.RanNodeName)},
+		SupportedTAList:  supportedTAList,
+		DefaultPagingDRX: &ie.PagingDRX{Value: ie.PagingDRXPresentV128},
+	}).MarshalBinary()
 }
 
-func BuildNGReset(
-	ngCause ngapType.Cause,
-	partOfNGInterface *ngapType.UEAssociatedLogicalNGConnectionList,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildNGReset(ie.Cause, *ie.UEAssociatedLogicalNGConnectionList) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -196,14 +93,10 @@ func BuildNGReset(
 	// 		nGResetIEs.List = append(nGResetIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildNGResetAcknowledge(
-	partOfNGInterface *ngapType.UEAssociatedLogicalNGConnectionList,
-	diagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildNGResetAcknowledge(*ie.UEAssociatedLogicalNGConnectionList, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -243,92 +136,27 @@ func BuildNGResetAcknowledge(
 	// 		nGResetAcknowledgeIEs.List = append(nGResetAcknowledgeIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildInitialContextSetupResponse(
 	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceSetupListCxtRes,
-	failedList *ngapType.PDUSessionResourceFailedToSetupListCxtRes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	responseList *ie.PDUSessionResourceSetupListCxtRes,
+	failedList *ie.PDUSessionResourceFailedToSetupListCxtRes,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
-	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
-
-	successfulOutcome := pdu.SuccessfulOutcome
-	successfulOutcome.ProcedureCode.Value = ngapType.ProcedureCodeInitialContextSetup
-	successfulOutcome.Criticality.Value = ngapType.CriticalityPresentReject
-
-	successfulOutcome.Value.Present = ngapType.SuccessfulOutcomePresentInitialContextSetupResponse
-	successfulOutcome.Value.InitialContextSetupResponse = new(ngapType.InitialContextSetupResponse)
-
-	initialContextSetupResponse := successfulOutcome.Value.InitialContextSetupResponse
-	initialContextSetupResponseIEs := &initialContextSetupResponse.ProtocolIEs
-
-	// AMF UE NGAP ID
-	ie := ngapType.InitialContextSetupResponseIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.InitialContextSetupResponseIEsPresentAMFUENGAPID
-	ie.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-
-	aMFUENGAPID := ie.Value.AMFUENGAPID
-	aMFUENGAPID.Value = ue.AmfUeNgapId
-
-	initialContextSetupResponseIEs.List = append(initialContextSetupResponseIEs.List, ie)
-
-	// RAN UE NGAP ID
-	ie = ngapType.InitialContextSetupResponseIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.InitialContextSetupResponseIEsPresentRANUENGAPID
-	ie.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-
-	rANUENGAPID := ie.Value.RANUENGAPID
-	rANUENGAPID.Value = ue.RanUeNgapId
-
-	initialContextSetupResponseIEs.List = append(initialContextSetupResponseIEs.List, ie)
-
-	// PDU Session Resource Setup Response List (optional)
-	if responseList != nil && len(responseList.List) > 0 {
-		ie = ngapType.InitialContextSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceSetupListCxtRes
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.InitialContextSetupResponseIEsPresentPDUSessionResourceSetupListCxtRes
-		ie.Value.PDUSessionResourceSetupListCxtRes = responseList
-		initialContextSetupResponseIEs.List = append(initialContextSetupResponseIEs.List, ie)
-	}
-
-	// PDU Session Resource Failed to Setup List (optional)
-	if failedList != nil && len(failedList.List) > 0 {
-		ie = ngapType.InitialContextSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceFailedToSetupListCxtRes
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.InitialContextSetupResponseIEsPresentPDUSessionResourceFailedToSetupListCxtRes
-		ie.Value.PDUSessionResourceFailedToSetupListCxtRes = failedList
-		initialContextSetupResponseIEs.List = append(initialContextSetupResponseIEs.List, ie)
-	}
-
-	// Criticality Diagnostics (optional)
-	if criticalityDiagnostics != nil {
-		ie = ngapType.InitialContextSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDCriticalityDiagnostics
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.CriticalityDiagnostics = criticalityDiagnostics
-		initialContextSetupResponseIEs.List = append(initialContextSetupResponseIEs.List, ie)
-	}
-
-	return ngap.Encoder(pdu)
+	return (&ngapMessage.InitialContextSetupResponse{
+		AMFUENGAPID:                       &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
+		RANUENGAPID:                       &ie.RANUENGAPID{Value: ue.RanUeNgapId},
+		PDUSessionResourceSetupListCxtRes: responseList,
+		PDUSessionResourceFailedToSetupListCxtRes: failedList,
+		CriticalityDiagnostics:                    criticalityDiagnostics,
+	}).MarshalBinary()
 }
 
 func BuildInitialContextSetupFailure(
-	ue *context.TNGFUe,
-	cause ngapType.Cause,
-	failedList *ngapType.PDUSessionResourceFailedToSetupListCxtFail,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	*context.TNGFUe, ie.Cause, *ie.PDUSessionResourceFailedToSetupListCxtFail, *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
 	// 	pdu.UnsuccessfulOutcome = new(ngapType.UnsuccessfulOutcome)
 	//
@@ -393,13 +221,10 @@ func BuildInitialContextSetupFailure(
 	// 		initialContextSetupFailureIEs.List = append(initialContextSetupFailureIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildUEContextModificationResponse(
-	ue *context.TNGFUe, criticalityDiagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildUEContextModificationResponse(*context.TNGFUe, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -444,13 +269,10 @@ func BuildUEContextModificationResponse(
 	// 	ie.Value.CriticalityDiagnostics = criticalityDiagnostics
 	// 	uEContextModificationResponseIEs.List = append(uEContextModificationResponseIEs.List, ie)
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildUEContextModificationFailure(ue *context.TNGFUe, cause ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildUEContextModificationFailure(*context.TNGFUe, ie.Cause, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
 	// 	pdu.UnsuccessfulOutcome = new(ngapType.UnsuccessfulOutcome)
 	//
@@ -503,13 +325,10 @@ func BuildUEContextModificationFailure(ue *context.TNGFUe, cause ngapType.Cause,
 	// 	ie.Value.CriticalityDiagnostics = criticalityDiagnostics
 	// 	uEContextModificationFailureIEs.List = append(uEContextModificationFailureIEs.List, ie)
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildUEContextReleaseComplete(ue *context.TNGFUe,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildUEContextReleaseComplete(*context.TNGFUe, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -594,11 +413,10 @@ func BuildUEContextReleaseComplete(ue *context.TNGFUe,
 	// 		uEContextReleaseCompleteIEs.List = append(uEContextReleaseCompleteIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildUEContextReleaseRequest(ue *context.TNGFUe, cause ngapType.Cause) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildUEContextReleaseRequest(*context.TNGFUe, ie.Cause) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -662,263 +480,65 @@ func BuildUEContextReleaseRequest(ue *context.TNGFUe, cause ngapType.Cause) ([]b
 	// 	ie.Value.Cause = &cause
 	// 	uEContextReleaseRequestIEs.List = append(uEContextReleaseRequestIEs.List, ie)
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildInitialUEMessage(ue *context.TNGFUe, nasPdu []byte,
-	allowedNSSAI *ngapType.AllowedNSSAI,
+func BuildInitialUEMessage(
+	ue *context.TNGFUe, nasPdu []byte, allowedNSSAI *ie.AllowedNSSAI,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
-	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
-
-	initiatingMessage := pdu.InitiatingMessage
-	initiatingMessage.ProcedureCode.Value = ngapType.ProcedureCodeInitialUEMessage
-	initiatingMessage.Criticality.Value = ngapType.CriticalityPresentIgnore
-
-	initiatingMessage.Value.Present = ngapType.InitiatingMessagePresentInitialUEMessage
-	initiatingMessage.Value.InitialUEMessage = new(ngapType.InitialUEMessage)
-
-	initialUEMessage := initiatingMessage.Value.InitialUEMessage
-	initialUEMessageIEs := &initialUEMessage.ProtocolIEs
-	// RANUENGAPID
-	{
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentRANUENGAPID
-		ie.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-
-		rANUENGAPID := ie.Value.RANUENGAPID
-		rANUENGAPID.Value = ue.RanUeNgapId
-
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
+	userLocationInformation, err := buildUserLocationInformation(ue)
+	if err != nil {
+		return nil, err
 	}
-	// NASPDU
-	{
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDNASPDU
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentNASPDU
-		ie.Value.NASPDU = new(ngapType.NASPDU)
 
-		nASPDU := ie.Value.NASPDU
-		nASPDU.Value = nasPdu
-
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
+	message := &ngapMessage.InitialUEMessage{
+		RANUENGAPID:             &ie.RANUENGAPID{Value: ue.RanUeNgapId},
+		NASPDU:                  &ie.NASPDU{Value: nasPdu},
+		UserLocationInformation: userLocationInformation,
+		RRCEstablishmentCause:   &ie.RRCEstablishmentCause{Value: aper.Enumerated(ue.RRCEstablishmentCause)},
+		UEContextRequest:        &ie.UEContextRequest{Value: ie.UEContextRequestPresentRequested},
+		AllowedNSSAI:            allowedNSSAI,
 	}
-	// UserLocationInformation
-	{
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDUserLocationInformation
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentUserLocationInformation
-		ie.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
 
-		userLocationInformation := ie.Value.UserLocationInformation
-		userLocationInformation.Present = ngapType.UserLocationInformationPresentChoiceExtensions
-		userLocationInformation.ChoiceExtensions = new(ngapType.ProtocolIESingleContainerUserLocationInformationExtIEs)
-
-		choiceExtensions := userLocationInformation.ChoiceExtensions
-		choiceExtensions.UserLocationInformationExtIEs = new(ngapType.UserLocationInformationExtIEs)
-
-		userLocationInformationExtIEs := choiceExtensions.UserLocationInformationExtIEs
-		userLocationInformationExtIEs.Id.Value = ngapType.ProtocolIEIDUserLocationInformationTNGF
-		userLocationInformationExtIEs.Criticality.Value = ngapType.CriticalityPresentIgnore
-
-		userLocationInformationExtIEsValue := new(ngapType.UserLocationInformationExtIEsValue)
-		userLocationInformationExtIEsValue.Present = ngapType.UserLocationInformationExtIEsPresentUserLocationInformationTNGF
-		userLocationInformationExtIEsValue.UserLocationInformationTNGF = new(ngapType.UserLocationInformationTNGF)
-
-		userLocationInfoTNGF := userLocationInformationExtIEsValue.UserLocationInformationTNGF
-		userLocationInfoTNGF.TNAPID = ngapConvert.TNAPIDToNgap(ue.TNAPID)
-		userLocationInfoTNGF.IPAddress = ngapConvert.IPAddressToNgap(ue.IPAddrv4, ue.IPAddrv6)
-		// userLocationInfoTNGF.PortNumber = ngapConvert.PortNumberToNgap(ue.PortNumber)
-
-		userLocationInformationExtIEs.Value = *userLocationInformationExtIEsValue
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
-	}
-	// RRCEstablishmentCause
-	{
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDRRCEstablishmentCause
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentRRCEstablishmentCause
-		ie.Value.RRCEstablishmentCause = new(ngapType.RRCEstablishmentCause)
-
-		rRCEstablishmentCause := ie.Value.RRCEstablishmentCause
-		rRCEstablishmentCause.Value = aper.Enumerated(ue.RRCEstablishmentCause)
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
-	}
-	// FiveGSTMSI
-	if len(ue.Guti) != 0 {
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDFiveGSTMSI
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentFiveGSTMSI
-		ie.Value.FiveGSTMSI = new(ngapType.FiveGSTMSI)
-
-		fiveGSTMSI := ie.Value.FiveGSTMSI
-		var amfID string
-		var tmsi string
-		if len(ue.Guti) == 19 {
-			amfID = ue.Guti[5:11]
-			tmsi = ue.Guti[11:]
-		} else {
-			amfID = ue.Guti[6:12]
-			tmsi = ue.Guti[12:]
-		}
-		_, amfSetID, amfPointer := ngapConvert.AmfIdToNgap(amfID)
-
-		fiveGSTMSI.AMFSetID.Value = amfSetID
-		fiveGSTMSI.AMFPointer.Value = amfPointer
-		var err error
-		fiveGSTMSI.FiveGTMSI.Value, err = hex.DecodeString(tmsi)
+	if ue.Guti != "" {
+		amfID, tmsi, err := splitGUTI(ue.Guti)
 		if err != nil {
-			logger.NgapLog.Errorf("DecodeString error: %+v", err)
+			return nil, err
 		}
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
-	}
-	// AMFSetID
-	if len(ue.Guti) != 0 {
-		ie := ngapType.InitialUEMessageIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDAMFSetID
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.InitialUEMessageIEsPresentAMFSetID
-		ie.Value.AMFSetID = new(ngapType.AMFSetID)
-
-		aMFSetID := ie.Value.AMFSetID
-		// <MCC><MNC><AMF Region ID><AMF Set ID><AMF Pointer><5G-TMSI>
-		// <MCC><MNC> is 3 bytes, <AMF Region ID><AMF Set ID><AMF Pointer> is 3 bytes
-		// 1 byte is 2 characters
-		var amfID string
-		if len(ue.Guti) == 19 { // MNC is 2 char
-			amfID = ue.Guti[5:11]
-		} else {
-			amfID = ue.Guti[6:12]
+		amfSetID, amfPointer, err := amfIDToNGAP(amfID)
+		if err != nil {
+			return nil, err
 		}
-		_, aMFSetID.Value, _ = ngapConvert.AmfIdToNgap(amfID)
-
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
-	}
-	// UEContextRequest
-	ie := ngapType.InitialUEMessageIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDUEContextRequest
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.InitialUEMessageIEsPresentUEContextRequest
-	ie.Value.UEContextRequest = new(ngapType.UEContextRequest)
-
-	ie.Value.UEContextRequest.Value = ngapType.UEContextRequestPresentRequested
-
-	initialUEMessageIEs.List = append(initialUEMessageIEs.List, ie)
-
-	// AllowedNSSAI
-	if allowedNSSAI != nil {
-		ue_ie := ngapType.InitialUEMessageIEs{}
-		ue_ie.Id.Value = ngapType.ProtocolIEIDAllowedNSSAI
-		ue_ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ue_ie.Value.Present = ngapType.InitialUEMessageIEsPresentAllowedNSSAI
-		ue_ie.Value.AllowedNSSAI = new(ngapType.AllowedNSSAI)
-
-		ue_ie.Value.AllowedNSSAI = allowedNSSAI
-
-		initialUEMessageIEs.List = append(initialUEMessageIEs.List, ue_ie)
+		tmsiBytes, err := hex.DecodeString(tmsi)
+		if err != nil {
+			return nil, fmt.Errorf("decode 5G-TMSI: %w", err)
+		}
+		message.FiveGSTMSI = &ie.FiveGSTMSI{
+			AMFSetID:   &ie.AMFSetID{Value: amfSetID},
+			AMFPointer: &ie.AMFPointer{Value: amfPointer},
+			FiveGTMSI:  &ie.FiveGTMSI{Value: tmsiBytes},
+		}
+		message.AMFSetID = &ie.AMFSetID{Value: amfSetID}
 	}
 
-	return ngap.Encoder(pdu)
+	return message.MarshalBinary()
 }
 
 func BuildUplinkNASTransport(ue *context.TNGFUe, nasPdu []byte) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
-	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
-
-	initiatingMessage := pdu.InitiatingMessage
-	initiatingMessage.ProcedureCode.Value = ngapType.ProcedureCodeUplinkNASTransport
-	initiatingMessage.Criticality.Value = ngapType.CriticalityPresentIgnore
-
-	initiatingMessage.Value.Present = ngapType.InitiatingMessagePresentUplinkNASTransport
-	initiatingMessage.Value.UplinkNASTransport = new(ngapType.UplinkNASTransport)
-
-	uplinkNasTransport := initiatingMessage.Value.UplinkNASTransport
-	uplinkNasTransportIEs := &uplinkNasTransport.ProtocolIEs
-
-	// AMF UE NGAP ID
-	{
-		ie := ngapType.UplinkNASTransportIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.UplinkNASTransportIEsPresentAMFUENGAPID
-		ie.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-
-		aMFUENGAPID := ie.Value.AMFUENGAPID
-		aMFUENGAPID.Value = ue.AmfUeNgapId
-		uplinkNasTransportIEs.List = append(uplinkNasTransportIEs.List, ie)
+	userLocationInformation, err := buildUserLocationInformation(ue)
+	if err != nil {
+		return nil, err
 	}
 
-	// RAN UE NGAP ID
-	{
-		ie := ngapType.UplinkNASTransportIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.UplinkNASTransportIEsPresentRANUENGAPID
-		ie.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-
-		rANUENGAPID := ie.Value.RANUENGAPID
-		rANUENGAPID.Value = ue.RanUeNgapId
-
-		uplinkNasTransportIEs.List = append(uplinkNasTransportIEs.List, ie)
-	}
-
-	// NAS-PDU
-	{
-		ie := ngapType.UplinkNASTransportIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDNASPDU
-		ie.Criticality.Value = ngapType.CriticalityPresentReject
-		ie.Value.Present = ngapType.UplinkNASTransportIEsPresentNASPDU
-		ie.Value.NASPDU = new(ngapType.NASPDU)
-		nASPDU := ie.Value.NASPDU
-		nASPDU.Value = nasPdu
-		uplinkNasTransportIEs.List = append(uplinkNasTransportIEs.List, ie)
-	}
-
-	// User Location Information
-	{
-		ie := ngapType.UplinkNASTransportIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDUserLocationInformation
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.UplinkNASTransportIEsPresentUserLocationInformation
-		ie.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
-
-		userLocationInformation := ie.Value.UserLocationInformation
-		userLocationInformation.Present = ngapType.UserLocationInformationPresentChoiceExtensions
-		userLocationInformation.ChoiceExtensions = new(ngapType.ProtocolIESingleContainerUserLocationInformationExtIEs)
-
-		choiceExtensions := userLocationInformation.ChoiceExtensions
-		choiceExtensions.UserLocationInformationExtIEs = new(ngapType.UserLocationInformationExtIEs)
-
-		userLocationInformationExtIEs := choiceExtensions.UserLocationInformationExtIEs
-		userLocationInformationExtIEs.Id.Value = ngapType.ProtocolIEIDUserLocationInformationTNGF
-		userLocationInformationExtIEs.Criticality.Value = ngapType.CriticalityPresentIgnore
-
-		userLocationInformationExtIEsValue := new(ngapType.UserLocationInformationExtIEsValue)
-		userLocationInformationExtIEsValue.Present = ngapType.UserLocationInformationExtIEsPresentUserLocationInformationTNGF
-		userLocationInformationExtIEsValue.UserLocationInformationTNGF = new(ngapType.UserLocationInformationTNGF)
-
-		userLocationInfoTNGF := userLocationInformationExtIEsValue.UserLocationInformationTNGF
-		userLocationInfoTNGF.TNAPID = ngapConvert.TNAPIDToNgap(ue.TNAPID)
-		userLocationInfoTNGF.IPAddress = ngapConvert.IPAddressToNgap(ue.IPAddrv4, ue.IPAddrv6)
-		// userLocationInfoTNGF.PortNumber = ngapConvert.PortNumberToNgap(ue.PortNumber)
-
-		userLocationInformationExtIEs.Value = *userLocationInformationExtIEsValue
-		uplinkNasTransportIEs.List = append(uplinkNasTransportIEs.List, ie)
-	}
-
-	return ngap.Encoder(pdu)
+	return (&ngapMessage.UplinkNASTransport{
+		AMFUENGAPID:             &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
+		RANUENGAPID:             &ie.RANUENGAPID{Value: ue.RanUeNgapId},
+		NASPDU:                  &ie.NASPDU{Value: nasPdu},
+		UserLocationInformation: userLocationInformation,
+	}).MarshalBinary()
 }
 
-func BuildNASNonDeliveryIndication(ue *context.TNGFUe, nasPdu []byte, cause ngapType.Cause) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildNASNonDeliveryIndication(*context.TNGFUe, []byte, ie.Cause) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -982,97 +602,32 @@ func BuildNASNonDeliveryIndication(ue *context.TNGFUe, nasPdu []byte, cause ngap
 	// 		nASNonDeliveryIndicationIEs.List = append(nASNonDeliveryIndicationIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildRerouteNASRequest() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildPDUSessionResourceSetupResponse(
 	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceSetupListSURes,
-	failedList *ngapType.PDUSessionResourceFailedToSetupListSURes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	responseList *ie.PDUSessionResourceSetupListSURes,
+	failedList *ie.PDUSessionResourceFailedToSetupListSURes,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
-	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
-
-	successfulOutcome := pdu.SuccessfulOutcome
-	successfulOutcome.ProcedureCode.Value = ngapType.ProcedureCodePDUSessionResourceSetup
-	successfulOutcome.Criticality.Value = ngapType.CriticalityPresentReject
-
-	successfulOutcome.Value.Present = ngapType.SuccessfulOutcomePresentPDUSessionResourceSetupResponse
-	successfulOutcome.Value.PDUSessionResourceSetupResponse = new(ngapType.PDUSessionResourceSetupResponse)
-
-	pduSessionResourceSetupResponse := successfulOutcome.Value.PDUSessionResourceSetupResponse
-	pduSessionResourceSetupResponseIEs := &pduSessionResourceSetupResponse.ProtocolIEs
-
-	// AMF UE NGAP ID
-	ie := ngapType.PDUSessionResourceSetupResponseIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID
-	ie.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-
-	aMFUENGAPID := ie.Value.AMFUENGAPID
-	aMFUENGAPID.Value = ue.AmfUeNgapId
-
-	pduSessionResourceSetupResponseIEs.List = append(pduSessionResourceSetupResponseIEs.List, ie)
-
-	// RAN UE NGAP ID
-	ie = ngapType.PDUSessionResourceSetupResponseIEs{}
-	ie.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ie.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID
-	ie.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-
-	rANUENGAPID := ie.Value.RANUENGAPID
-	rANUENGAPID.Value = ue.RanUeNgapId
-
-	pduSessionResourceSetupResponseIEs.List = append(pduSessionResourceSetupResponseIEs.List, ie)
-
-	// PDU Session Resource Setup Response List (optional)
-	if responseList != nil && len(responseList.List) > 0 {
-		ie = ngapType.PDUSessionResourceSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceSetupListSURes
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentPDUSessionResourceSetupListSURes
-		ie.Value.PDUSessionResourceSetupListSURes = responseList
-		pduSessionResourceSetupResponseIEs.List = append(pduSessionResourceSetupResponseIEs.List, ie)
-	}
-
-	// PDU Session Resource Failed to Setup List (optional)
-	if failedList != nil && len(failedList.List) > 0 {
-		ie = ngapType.PDUSessionResourceSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceFailedToSetupListSURes
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentPDUSessionResourceFailedToSetupListSURes
-		ie.Value.PDUSessionResourceFailedToSetupListSURes = failedList
-		pduSessionResourceSetupResponseIEs.List = append(pduSessionResourceSetupResponseIEs.List, ie)
-	}
-
-	// Criticality Diagnostics (optional)
-	if criticalityDiagnostics != nil {
-		ie = ngapType.PDUSessionResourceSetupResponseIEs{}
-		ie.Id.Value = ngapType.ProtocolIEIDCriticalityDiagnostics
-		ie.Criticality.Value = ngapType.CriticalityPresentIgnore
-		ie.Value.CriticalityDiagnostics = criticalityDiagnostics
-		pduSessionResourceSetupResponseIEs.List = append(pduSessionResourceSetupResponseIEs.List, ie)
-	}
-
-	return ngap.Encoder(pdu)
+	return (&ngapMessage.PDUSessionResourceSetupResponse{
+		AMFUENGAPID:                              &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
+		RANUENGAPID:                              &ie.RANUENGAPID{Value: ue.RanUeNgapId},
+		PDUSessionResourceSetupListSURes:         responseList,
+		PDUSessionResourceFailedToSetupListSURes: failedList,
+		CriticalityDiagnostics:                   criticalityDiagnostics,
+	}).MarshalBinary()
 }
 
 func BuildPDUSessionResourceModifyResponse(
-	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceModifyListModRes,
-	failedList *ngapType.PDUSessionResourceFailedToModifyListModRes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	*context.TNGFUe, *ie.PDUSessionResourceModifyListModRes, *ie.PDUSessionResourceFailedToModifyListModRes,
+	*ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -1152,14 +707,10 @@ func BuildPDUSessionResourceModifyResponse(
 	// 		pduSessionResourceModifyResponseIEs.List = append(pduSessionResourceModifyResponseIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildPDUSessionResourceModifyIndication(
-	ue *context.TNGFUe,
-	modifyList []ngapType.PDUSessionResourceModifyItemModInd,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildPDUSessionResourceModifyIndication(*context.TNGFUe, []ie.PDUSessionResourceModifyItemModInd) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -1212,15 +763,12 @@ func BuildPDUSessionResourceModifyIndication(
 	// 		pDUSessionResourceModifyIndicationIEs.List = append(pDUSessionResourceModifyIndicationIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildPDUSessionResourceNotify(
-	ue *context.TNGFUe,
-	notiList *ngapType.PDUSessionResourceNotifyList,
-	relList *ngapType.PDUSessionResourceReleasedListNot,
+	*context.TNGFUe, *ie.PDUSessionResourceNotifyList, *ie.PDUSessionResourceReleasedListNot,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -1305,15 +853,12 @@ func BuildPDUSessionResourceNotify(
 	// 		pDUSessionResourceNotifyIEs.List = append(pDUSessionResourceNotifyIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildPDUSessionResourceReleaseResponse(
-	ue *context.TNGFUe,
-	relList ngapType.PDUSessionResourceReleasedListRelRes,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	*context.TNGFUe, ie.PDUSessionResourceReleasedListRelRes, *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -1398,16 +943,10 @@ func BuildPDUSessionResourceReleaseResponse(
 	// 		pDUSessionResourceReleaseResponseIEs.List = append(pDUSessionResourceReleaseResponseIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildErrorIndication(
-	amfUENGAPID *int64,
-	ranUENGAPID *int64,
-	cause *ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildErrorIndication(*int64, *int64, *ie.Cause, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -1459,19 +998,14 @@ func BuildErrorIndication(
 	// 		errorIndicationIEs.List = append(errorIndicationIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildUERadioCapabilityInfoIndication() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildUERadioCapabilityCheckResponse(
-	ue *context.TNGFUe,
-	diagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildUERadioCapabilityCheckResponse(*context.TNGFUe, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -1534,15 +1068,12 @@ func BuildUERadioCapabilityCheckResponse(
 	// 		uERadioCapabilityCheckResponseIEs.List = append(uERadioCapabilityCheckResponseIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildAMFConfigurationUpdateAcknowledge(
-	setupList *ngapType.AMFTNLAssociationSetupList,
-	failList *ngapType.TNLAssociationList,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	*ie.AMFTNLAssociationSetupList, *ie.TNLAssociationList, *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	// 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
 	//
@@ -1595,15 +1126,10 @@ func BuildAMFConfigurationUpdateAcknowledge(
 	// 		aMFConfigurationUpdateAcknowledgeIEs.List = append(aMFConfigurationUpdateAcknowledgeIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
-func BuildAMFConfigurationUpdateFailure(
-	ngCause ngapType.Cause,
-	time *ngapType.TimeToWait,
-	diagnostics *ngapType.CriticalityDiagnostics,
-) ([]byte, error) {
-	var pdu ngapType.NGAPPDU
+func BuildAMFConfigurationUpdateFailure(ie.Cause, *ie.TimeToWait, *ie.CriticalityDiagnostics) ([]byte, error) {
 	// 	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
 	// 	pdu.UnsuccessfulOutcome = new(ngapType.UnsuccessfulOutcome)
 	//
@@ -1656,11 +1182,10 @@ func BuildAMFConfigurationUpdateFailure(
 	// 		aMFConfigurationUpdateFailureIEs.List = append(aMFConfigurationUpdateFailureIEs.List, ie)
 	// 	}
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildRANConfigurationUpdate() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
 	// 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	// 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
 	//
@@ -1757,130 +1282,214 @@ func BuildRANConfigurationUpdate() ([]byte, error) {
 	// 	// 	rANConfigurationUpdateIEs.List = append(rANConfigurationUpdateIEs.List, ie)
 	// 	// }
 	//
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildUplinkRANConfigurationTransfer() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildUplinkRANStatusTransfer() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildLocationReportingFailureIndication() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildLocationReport() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildRRCInactiveTransitionReport() ([]byte, error) {
-	var pdu ngapType.NGAPPDU
-	return ngap.Encoder(pdu)
+	return nil, errBuilderNotImplemented
 }
 
 func BuildPDUSessionResourceSetupResponseTransfer(pduSession *context.PDUSession) ([]byte, error) {
-	// TNGF context
-	tngfSelf := context.TNGFSelf()
-
-	transfer := ngapType.PDUSessionResourceSetupResponseTransfer{}
-
-	// TODO: use tunnel info allocated by tngf
-	// QOS Flow Per TNL Information
-	qosFlowPerTNLInformation := &transfer.DLQosFlowPerTNLInformation
-
-	// UP transport layer information - UE(RAN) side
-	qosFlowPerTNLInformation.UPTransportLayerInformation.Present = ngapType.UPTransportLayerInformationPresentGTPTunnel
-	qosFlowPerTNLInformation.UPTransportLayerInformation.GTPTunnel = new(ngapType.GTPTunnel)
-
-	gtpTunnel := qosFlowPerTNLInformation.UPTransportLayerInformation.GTPTunnel
+	address, err := transportLayerAddress(context.TNGFSelf().GTPBindAddress, "")
+	if err != nil {
+		return nil, err
+	}
 	teid := make([]byte, 4)
 	binary.BigEndian.PutUint32(teid, pduSession.GTPConnection.IncomingTEID)
-	gtpTunnel.GTPTEID.Value = teid
-	gtpTunnel.TransportLayerAddress = ngapConvert.IPAddressToNgap(tngfSelf.GTPBindAddress, "")
 
-	// Associated Qos Flow List
-	for _, qfi := range pduSession.QFIList {
-		associatedQosFlowItem := ngapType.AssociatedQosFlowItem{
-			QosFlowIdentifier: ngapType.QosFlowIdentifier{
-				Value: int64(qfi),
+	qosFlowPerTNLInformation := &ie.QosFlowPerTNLInformation{
+		UPTransportLayerInformation: &ie.UPTransportLayerInformation{
+			Choice: &ie.GTPTunnel{
+				TransportLayerAddress: address,
+				GTPTEID:               &ie.GTPTEID{Value: teid},
 			},
-		}
+		},
+		AssociatedQosFlowList: &ie.AssociatedQosFlowList{},
+	}
+	for _, qfi := range pduSession.QFIList {
 		qosFlowPerTNLInformation.AssociatedQosFlowList.List = append(
-			qosFlowPerTNLInformation.AssociatedQosFlowList.List, associatedQosFlowItem)
+			qosFlowPerTNLInformation.AssociatedQosFlowList.List,
+			ie.AssociatedQosFlowItem{QosFlowIdentifier: &ie.QosFlowIdentifier{Value: int64(qfi)}},
+		)
 	}
 
-	return aper.MarshalWithParams(transfer, "valueExt")
+	return marshalTransfer(&ie.PDUSessionResourceSetupResponseTransfer{
+		DLQosFlowPerTNLInformation: qosFlowPerTNLInformation,
+	})
 }
 
 func BuildPDUSessionResourceSetupUnsuccessfulTransfer(
-	cause ngapType.Cause, criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	cause ie.Cause, criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	transfer := ngapType.PDUSessionResourceSetupUnsuccessfulTransfer{}
-
-	// Cause
-	transfer.Cause = cause
-
-	// Criticality Diagnostics (optional)
-	if criticalityDiagnostics != nil {
-		transfer.CriticalityDiagnostics = criticalityDiagnostics
-	}
-
-	return aper.MarshalWithParams(transfer, "valueExt")
+	return marshalTransfer(&ie.PDUSessionResourceSetupUnsuccessfulTransfer{
+		Cause:                  &cause,
+		CriticalityDiagnostics: criticalityDiagnostics,
+	})
 }
 
 func BuildPDUSessionResourceModifyResponseTransfer(
-	ulNGUUPTNLInformation *ngapType.UPTransportLayerInformation,
-	dlNGUUPTNLInformation *ngapType.UPTransportLayerInformation,
-	responseList *ngapType.QosFlowAddOrModifyResponseList,
-	failedList *ngapType.QosFlowListWithCause,
+	ulNGUUPTNLInformation *ie.UPTransportLayerInformation,
+	dlNGUUPTNLInformation *ie.UPTransportLayerInformation,
+	responseList *ie.QosFlowAddOrModifyResponseList,
+	failedList *ie.QosFlowListWithCause,
 ) ([]byte, error) {
-	transfer := ngapType.PDUSessionResourceModifyResponseTransfer{}
-	//
-	// 	// ulNGUUPTNLInformation store user plane tunnel information of
-	// 	// 5GC's endpoint (optional)
-	// 	if ulNGUUPTNLInformation != nil {
-	// 		transfer.ULNGUUPTNLInformation = ulNGUUPTNLInformation
-	// 	}
-	//
-	// 	// dlNGUUPTNLInformation store user plane tunnel information of
-	// 	// ran's endpoint (optional)
-	// 	if dlNGUUPTNLInformation != nil {
-	// 		transfer.DLNGUUPTNLInformation = dlNGUUPTNLInformation
-	// 	}
-	//
-	// 	if responseList != nil && len(responseList.List) != 0 {
-	// 		transfer.QosFlowAddOrModifyResponseList = responseList
-	// 	}
-	//
-	// 	// Additional Qos Flow per TNL Information (optional)
-	//
-	// 	// Qos Flow Failed to Add or Modify List (optional)
-	// 	if failedList != nil && len(failedList.List) != 0 {
-	// 		transfer.QosFlowFailedToAddOrModifyList = failedList
-	// 	}
-	//
-	return aper.MarshalWithParams(transfer, "valueExt")
+	return marshalTransfer(&ie.PDUSessionResourceModifyResponseTransfer{
+		ULNGUUPTNLInformation:          ulNGUUPTNLInformation,
+		DLNGUUPTNLInformation:          dlNGUUPTNLInformation,
+		QosFlowAddOrModifyResponseList: responseList,
+		QosFlowFailedToAddOrModifyList: failedList,
+	})
 }
 
-func BuildPDUSessionResourceModifyUnsuccessfulTransfer(cause ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+func BuildPDUSessionResourceModifyUnsuccessfulTransfer(
+	cause ie.Cause, criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
-	transfer := ngapType.PDUSessionResourceModifyUnsuccessfulTransfer{}
+	return marshalTransfer(&ie.PDUSessionResourceModifyUnsuccessfulTransfer{
+		Cause:                  &cause,
+		CriticalityDiagnostics: criticalityDiagnostics,
+	})
+}
 
-	// 	// Cause
-	// 	transfer.Cause = cause
-	//
-	// 	// Criticality Diagnostics (optional)
-	// 	if criticalityDiagnostics != nil {
-	// 		transfer.CriticalityDiagnostics = criticalityDiagnostics
-	// 	}
-	//
-	return aper.MarshalWithParams(transfer, "valueExt")
+func buildSupportedTAList(items []context.SupportedTAItem) (*ie.SupportedTAList, error) {
+	list := &ie.SupportedTAList{}
+	for _, item := range items {
+		tac, err := hex.DecodeString(item.TAC)
+		if err != nil {
+			return nil, fmt.Errorf("decode TAC: %w", err)
+		}
+		supportedTAItem := ie.SupportedTAItem{
+			TAC:               &ie.TAC{Value: tac},
+			BroadcastPLMNList: &ie.BroadcastPLMNList{},
+		}
+		for _, broadcast := range item.BroadcastPLMNList {
+			plmn := util.PlmnIdToNgap(broadcast.PLMNID)
+			broadcastPLMNItem := ie.BroadcastPLMNItem{
+				PLMNIdentity:        &plmn,
+				TAISliceSupportList: &ie.SliceSupportList{},
+			}
+			for _, slice := range broadcast.TAISliceSupportList {
+				sst, err := hex.DecodeString(slice.SNSSAI.SST)
+				if err != nil {
+					return nil, fmt.Errorf("decode S-NSSAI SST: %w", err)
+				}
+				snssai := &ie.SNSSAI{SST: &ie.SST{Value: sst}}
+				if slice.SNSSAI.SD != "" {
+					sd, err := hex.DecodeString(slice.SNSSAI.SD)
+					if err != nil {
+						return nil, fmt.Errorf("decode S-NSSAI SD: %w", err)
+					}
+					snssai.SD = &ie.SD{Value: sd}
+				}
+				broadcastPLMNItem.TAISliceSupportList.List = append(
+					broadcastPLMNItem.TAISliceSupportList.List,
+					ie.SliceSupportItem{SNSSAI: snssai},
+				)
+			}
+			supportedTAItem.BroadcastPLMNList.List = append(
+				supportedTAItem.BroadcastPLMNList.List, broadcastPLMNItem,
+			)
+		}
+		list.List = append(list.List, supportedTAItem)
+	}
+	return list, nil
+}
+
+func buildUserLocationInformation(ue *context.TNGFUe) (*ie.UserLocationInformation, error) {
+	address, err := transportLayerAddress(ue.IPAddrv4, ue.IPAddrv6)
+	if err != nil {
+		return nil, err
+	}
+	tnapID := make([]byte, 6)
+	binary.BigEndian.PutUint16(tnapID[:2], uint16(ue.TNAPID>>32))
+	binary.BigEndian.PutUint32(tnapID[2:], uint32(ue.TNAPID))
+	return &ie.UserLocationInformation{
+		Choice: &ie.ProtocolIESingleContainerUserLocationInformationExtIEs{
+			UserLocationInformationExtIEs: ie.UserLocationInformationExtIEs{
+				UserLocationInformationTNGF: &ie.UserLocationInformationTNGF{
+					TNAPID:    &ie.TNAPID{Value: tnapID},
+					IPAddress: address,
+				},
+			},
+		},
+	}, nil
+}
+
+func transportLayerAddress(ipv4, ipv6 string) (*ie.TransportLayerAddress, error) {
+	address := &ie.TransportLayerAddress{}
+	switch {
+	case ipv4 != "" && ipv6 != "":
+		v4 := net.ParseIP(ipv4).To4()
+		v6 := net.ParseIP(ipv6).To16()
+		if v4 == nil || v6 == nil {
+			return nil, fmt.Errorf("invalid IPv4/IPv6 address: %q, %q", ipv4, ipv6)
+		}
+		address.Value = aper.BitString{Bytes: append(append([]byte{}, v4...), v6...), BitLength: 160}
+	case ipv4 != "":
+		v4 := net.ParseIP(ipv4).To4()
+		if v4 == nil {
+			return nil, fmt.Errorf("invalid IPv4 address: %q", ipv4)
+		}
+		address.Value = aper.BitString{Bytes: v4, BitLength: 32}
+	case ipv6 != "":
+		v6 := net.ParseIP(ipv6).To16()
+		if v6 == nil {
+			return nil, fmt.Errorf("invalid IPv6 address: %q", ipv6)
+		}
+		address.Value = aper.BitString{Bytes: v6, BitLength: 128}
+	default:
+		return nil, errors.New("at least one UE IP address is required")
+	}
+	return address, nil
+}
+
+func splitGUTI(guti string) (amfID, tmsi string, err error) {
+	switch len(guti) {
+	case 19:
+		return guti[5:11], guti[11:], nil
+	case 20:
+		return guti[6:12], guti[12:], nil
+	default:
+		return "", "", fmt.Errorf("invalid GUTI length: %d", len(guti))
+	}
+}
+
+func amfIDToNGAP(amfID string) (aper.BitString, aper.BitString, error) {
+	if len(amfID) != 6 {
+		return aper.BitString{}, aper.BitString{}, fmt.Errorf("invalid AMF ID length: %d", len(amfID))
+	}
+	setIDBytes, err := hex.DecodeString(amfID[2:5] + "0")
+	if err != nil {
+		return aper.BitString{}, aper.BitString{}, fmt.Errorf("decode AMF set ID: %w", err)
+	}
+	pointerBytes, err := hex.DecodeString(amfID[4:])
+	if err != nil {
+		return aper.BitString{}, aper.BitString{}, fmt.Errorf("decode AMF pointer: %w", err)
+	}
+	setIDBytes[1] &= 0xc0
+	return aper.BitString{Bytes: setIDBytes, BitLength: 10},
+		aper.BitString{Bytes: []byte{pointerBytes[0] << 2}, BitLength: 6}, nil
+}
+
+func marshalTransfer(value interface{ Write(*aper.PerBitData) error }) ([]byte, error) {
+	data := aper.NewPerBitData(nil)
+	if err := value.Write(data); err != nil {
+		return nil, err
+	}
+	return data.Bytes(), nil
 }

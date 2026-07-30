@@ -13,7 +13,8 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/ie"
+	ngapMessage "github.com/free5gc/ngap/message"
 	"github.com/free5gc/tngf/internal/logger"
 	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
@@ -1001,10 +1002,9 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 					ikeLog.Errorf("Encrypting IKE message failed: %+v", encrypt_err)
 					thisUE.TemporaryPDUSessionSetupData.UnactivatedPDUSession = thisUE.
 						TemporaryPDUSessionSetupData.UnactivatedPDUSession[1:]
-					cause := ngapType.Cause{
-						Present: ngapType.CausePresentTransport,
-						Transport: &ngapType.CauseTransport{
-							Value: ngapType.CauseTransportPresentTransportResourceUnavailable,
+					cause := ie.Cause{
+						Choice: &ie.CauseTransport{
+							Value: ie.CauseTransportPresentTransportResourceUnavailable,
 						},
 					}
 					transfer, pdu_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(cause, nil)
@@ -1361,10 +1361,9 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 			if encrypt_err := EncryptProcedure(thisUE.TNGFIKESecurityAssociation, ikePayload, ikeMessage); encrypt_err != nil {
 				ikeLog.Errorf("Encrypting IKE message failed: %+v", encrypt_err)
 				temporaryPDUSessionSetupData.UnactivatedPDUSession = temporaryPDUSessionSetupData.UnactivatedPDUSession[1:]
-				cause := ngapType.Cause{
-					Present: ngapType.CausePresentTransport,
-					Transport: &ngapType.CauseTransport{
-						Value: ngapType.CauseTransportPresentTransportResourceUnavailable,
+				cause := ie.Cause{
+					Choice: &ie.CauseTransport{
+						Value: ie.CauseTransportPresentTransportResourceUnavailable,
 					},
 				}
 				resource_transfer, pdusetup_err := ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(cause, nil)
@@ -1372,7 +1371,7 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 					ikeLog.Errorf("Build PDU Session Resource Setup Unsuccessful Transfer Failed: %+v", pdusetup_err)
 					continue
 				}
-				if ngapProcedure == ngapType.ProcedureCodeInitialContextSetup {
+				if ngapProcedure == ngapMessage.ProcedureCodeInitialContextSetup {
 					ngap_message.AppendPDUSessionResourceFailedToSetupListCxtRes(
 						temporaryPDUSessionSetupData.FailedListCxtRes, tmp_pduSessionID, resource_transfer)
 				} else {
@@ -1387,7 +1386,7 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 		} else {
 			// Send Response to AMF
 			ngapProcedure := temporaryPDUSessionSetupData.NGAPProcedureCode.Value
-			if ngapProcedure == ngapType.ProcedureCodeInitialContextSetup {
+			if ngapProcedure == ngapMessage.ProcedureCodeInitialContextSetup {
 				ngap_message.SendInitialContextSetupResponse(thisUE.AMF, thisUE,
 					temporaryPDUSessionSetupData.SetupListCxtRes,
 					temporaryPDUSessionSetupData.FailedListCxtRes, nil)

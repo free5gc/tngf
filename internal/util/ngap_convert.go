@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/free5gc/aper"
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/aper"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/pkg/context"
 )
 
-func PlmnIdToNgap(plmnId context.PLMNID) (ngapPlmnId ngapType.PLMNIdentity) {
+func PlmnIdToNgap(plmnId context.PLMNID) (ngapPlmnId ie.PLMNIdentity) {
 	var hexString string
 	mcc := strings.Split(plmnId.Mcc, "")
 	mnc := strings.Split(plmnId.Mnc, "")

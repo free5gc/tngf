@@ -13,7 +13,7 @@ import (
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
 	"golang.org/x/net/ipv4"
 
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/util/idgenerator"
@@ -212,7 +212,16 @@ func (context *TNGFContext) UELoadbyIDi(idi []byte) *TNGFUe {
 			return true
 		}
 
-		strSuci := hex.EncodeToString(candidate.UEIdentity.Buffer)
+		identityRaw := candidate.UEIdentityRaw
+		if identityRaw == nil {
+			var err error
+			identityRaw, err = candidate.UEIdentity.MarshalBinary()
+			if err != nil {
+				contextLog.Errorf("could not marshal UE identity: %v", err)
+				return true
+			}
+		}
+		strSuci := hex.EncodeToString(identityRaw)
 		contextLog.Debugln("Idi", strIdi)
 		contextLog.Debugln("SUCI", strSuci)
 		if strIdi == strSuci {
@@ -308,8 +317,8 @@ func (context *TNGFContext) AllocatedUETEIDLoad(teid uint32) (*TNGFUe, bool) {
 	}
 }
 
-func (context *TNGFContext) AMFSelection(ueSpecifiedGUAMI *ngapType.GUAMI,
-	ueSpecifiedPLMNId *ngapType.PLMNIdentity,
+func (context *TNGFContext) AMFSelection(ueSpecifiedGUAMI *ie.GUAMI,
+	ueSpecifiedPLMNId *ie.PLMNIdentity,
 ) *TNGFAMF {
 	var availableAMF *TNGFAMF
 	context.AMFPool.Range(func(key, value interface{}) bool {

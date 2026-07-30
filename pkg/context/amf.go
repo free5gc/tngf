@@ -3,19 +3,18 @@ package context
 import (
 	"bytes"
 
-	"github.com/free5gc/aper"
-	"github.com/free5gc/ngap/ngapConvert"
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/aper"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/sctp"
 )
 
 type TNGFAMF struct {
 	SCTPAddr              string
 	SCTPConn              *sctp.SCTPConn
-	AMFName               *ngapType.AMFName
-	ServedGUAMIList       *ngapType.ServedGUAMIList
-	RelativeAMFCapacity   *ngapType.RelativeAMFCapacity
-	PLMNSupportList       *ngapType.PLMNSupportList
+	AMFName               *ie.AMFName
+	ServedGUAMIList       *ie.ServedGUAMIList
+	RelativeAMFCapacity   *ie.RelativeAMFCapacity
+	PLMNSupportList       *ie.PLMNSupportList
 	AMFTNLAssociationList map[string]*AMFTNLAssociationItem // v4+v6 as key
 	// Overload related
 	AMFOverloadContent *AMFOverloadContent
@@ -26,19 +25,19 @@ type TNGFAMF struct {
 type AMFTNLAssociationItem struct {
 	Ipv4                   string
 	Ipv6                   string
-	TNLAssociationUsage    *ngapType.TNLAssociationUsage
+	TNLAssociationUsage    *ie.TNLAssociationUsage
 	TNLAddressWeightFactor *int64
 }
 
 type AMFOverloadContent struct {
-	Action     *ngapType.OverloadAction
+	Action     *ie.OverloadAction
 	TrafficInd *int64
 	NSSAIList  []SliceOverloadItem
 }
 
 type SliceOverloadItem struct {
-	SNssaiList []ngapType.SNSSAI
-	Action     *ngapType.OverloadAction
+	SNssaiList []ie.SNSSAI
+	Action     *ie.OverloadAction
 	TrafficInd *int64
 }
 
@@ -64,33 +63,48 @@ func (amf *TNGFAMF) RemoveAllRelatedUe() {
 	}
 }
 
-func (amf *TNGFAMF) AddAMFTNLAssociationItem(info ngapType.CPTransportLayerInformation) *AMFTNLAssociationItem {
+func (amf *TNGFAMF) AddAMFTNLAssociationItem(info ie.CPTransportLayerInformation) *AMFTNLAssociationItem {
+	address, ok := info.Choice.(*ie.TransportLayerAddress)
+	if !ok {
+		return nil
+	}
+
 	item := &AMFTNLAssociationItem{}
-	item.Ipv4, item.Ipv6 = ngapConvert.IPAddressToString(*info.EndpointIPAddress)
+	item.Ipv4, item.Ipv6 = transportLayerAddressToIPStrings(address)
 	amf.AMFTNLAssociationList[item.Ipv4+item.Ipv6] = item
 	return item
 }
 
-func (amf *TNGFAMF) FindAMFTNLAssociationItem(info ngapType.CPTransportLayerInformation) *AMFTNLAssociationItem {
-	v4, v6 := ngapConvert.IPAddressToString(*info.EndpointIPAddress)
+func (amf *TNGFAMF) FindAMFTNLAssociationItem(info ie.CPTransportLayerInformation) *AMFTNLAssociationItem {
+	address, ok := info.Choice.(*ie.TransportLayerAddress)
+	if !ok {
+		return nil
+	}
+
+	v4, v6 := transportLayerAddressToIPStrings(address)
 	return amf.AMFTNLAssociationList[v4+v6]
 }
 
-func (amf *TNGFAMF) DeleteAMFTNLAssociationItem(info ngapType.CPTransportLayerInformation) {
-	v4, v6 := ngapConvert.IPAddressToString(*info.EndpointIPAddress)
+func (amf *TNGFAMF) DeleteAMFTNLAssociationItem(info ie.CPTransportLayerInformation) {
+	address, ok := info.Choice.(*ie.TransportLayerAddress)
+	if !ok {
+		return
+	}
+
+	v4, v6 := transportLayerAddressToIPStrings(address)
 	delete(amf.AMFTNLAssociationList, v4+v6)
 }
 
 func (amf *TNGFAMF) StartOverload(
-	resp *ngapType.OverloadResponse, trafloadInd *ngapType.TrafficLoadReductionIndication,
-	nssai *ngapType.OverloadStartNSSAIList,
+	resp *ie.OverloadResponse, trafloadInd *ie.TrafficLoadReductionIndication,
+	nssai *ie.OverloadStartNSSAIList,
 ) *AMFOverloadContent {
 	if resp == nil && trafloadInd == nil && nssai == nil {
 		return nil
 	}
 	content := AMFOverloadContent{}
 	if resp != nil {
-		content.Action = resp.OverloadAction
+		content.Action = overloadAction(resp)
 	}
 	if trafloadInd != nil {
 		content.TrafficInd = &trafloadInd.Value
@@ -98,11 +112,15 @@ func (amf *TNGFAMF) StartOverload(
 	if nssai != nil {
 		for _, item := range nssai.List {
 			sliceItem := SliceOverloadItem{}
-			for _, item2 := range item.SliceOverloadList.List {
-				sliceItem.SNssaiList = append(sliceItem.SNssaiList, item2.SNSSAI)
+			if item.SliceOverloadList != nil {
+				for _, item2 := range item.SliceOverloadList.List {
+					if item2.SNSSAI != nil {
+						sliceItem.SNssaiList = append(sliceItem.SNssaiList, *item2.SNSSAI)
+					}
+				}
 			}
 			if item.SliceOverloadResponse != nil {
-				sliceItem.Action = item.SliceOverloadResponse.OverloadAction
+				sliceItem.Action = overloadAction(item.SliceOverloadResponse)
 			}
 			if item.SliceTrafficLoadReductionIndication != nil {
 				sliceItem.TrafficInd = &item.SliceTrafficLoadReductionIndication.Value
@@ -120,17 +138,9 @@ func (amf *TNGFAMF) StopOverload() {
 
 // FindAvalibleAMFByCompareGUAMI compares the incoming GUAMI with AMF served GUAMI
 // and return if this AMF is avalible for UE
-func (amf *TNGFAMF) FindAvalibleAMFByCompareGUAMI(ueSpecifiedGUAMI *ngapType.GUAMI) bool {
+func (amf *TNGFAMF) FindAvalibleAMFByCompareGUAMI(ueSpecifiedGUAMI *ie.GUAMI) bool {
 	for _, amfServedGUAMI := range amf.ServedGUAMIList.List {
-		codedAMFServedGUAMI, err := aper.MarshalWithParams(&amfServedGUAMI.GUAMI, "valueExt")
-		if err != nil {
-			return false
-		}
-		codedUESpecifiedGUAMI, err := aper.MarshalWithParams(ueSpecifiedGUAMI, "valueExt")
-		if err != nil {
-			return false
-		}
-		if !bytes.Equal(codedAMFServedGUAMI, codedUESpecifiedGUAMI) {
+		if !equalGUAMI(amfServedGUAMI.GUAMI, ueSpecifiedGUAMI) {
 			continue
 		}
 		return true
@@ -138,12 +148,41 @@ func (amf *TNGFAMF) FindAvalibleAMFByCompareGUAMI(ueSpecifiedGUAMI *ngapType.GUA
 	return false
 }
 
-func (amf *TNGFAMF) FindAvalibleAMFByCompareSelectedPLMNId(ueSpecifiedSelectedPLMNId *ngapType.PLMNIdentity) bool {
+func (amf *TNGFAMF) FindAvalibleAMFByCompareSelectedPLMNId(ueSpecifiedSelectedPLMNId *ie.PLMNIdentity) bool {
 	for _, amfServedPLMNId := range amf.PLMNSupportList.List {
+		if amfServedPLMNId.PLMNIdentity == nil || ueSpecifiedSelectedPLMNId == nil {
+			continue
+		}
 		if !bytes.Equal(amfServedPLMNId.PLMNIdentity.Value, ueSpecifiedSelectedPLMNId.Value) {
 			continue
 		}
 		return true
 	}
 	return false
+}
+
+func overloadAction(response *ie.OverloadResponse) *ie.OverloadAction {
+	if response == nil {
+		return nil
+	}
+
+	action, _ := response.Choice.(*ie.OverloadAction)
+	return action
+}
+
+func equalGUAMI(first, second *ie.GUAMI) bool {
+	if first == nil || second == nil {
+		return false
+	}
+
+	firstData := aper.NewPerBitData(nil)
+	if err := first.Write(firstData); err != nil {
+		return false
+	}
+	secondData := aper.NewPerBitData(nil)
+	if err := second.Write(secondData); err != nil {
+		return false
+	}
+
+	return bytes.Equal(firstData.Bytes(), secondData.Bytes())
 }

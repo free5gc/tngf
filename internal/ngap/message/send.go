@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/pkg/context"
@@ -14,7 +14,7 @@ import (
 
 var (
 	ngaplog    *logrus.Entry
-	emptyCause = ngapType.Cause{Present: 0}
+	emptyCause = ie.Cause{}
 )
 
 func init() {
@@ -75,8 +75,8 @@ func SendNGSetupRequest(conn *sctp.SCTPConn) {
 // partOfNGInterface: if reset type is "reset all", set it to nil TS 38.413 9.2.6.11
 func SendNGReset(
 	amf *context.TNGFAMF,
-	cause ngapType.Cause,
-	partOfNGInterface *ngapType.UEAssociatedLogicalNGConnectionList,
+	cause ie.Cause,
+	partOfNGInterface *ie.UEAssociatedLogicalNGConnectionList,
 ) {
 	isNGResetSent := false
 	additionalCause := ""
@@ -96,8 +96,8 @@ func SendNGReset(
 
 func SendNGResetAcknowledge(
 	amf *context.TNGFAMF,
-	partOfNGInterface *ngapType.UEAssociatedLogicalNGConnectionList,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	partOfNGInterface *ie.UEAssociatedLogicalNGConnectionList,
+	diagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send NG Reset Acknowledge")
 
@@ -125,9 +125,9 @@ func SendNGResetAcknowledge(
 func SendInitialContextSetupResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceSetupListCxtRes,
-	failedList *ngapType.PDUSessionResourceFailedToSetupListCxtRes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	responseList *ie.PDUSessionResourceSetupListCxtRes,
+	failedList *ie.PDUSessionResourceFailedToSetupListCxtRes,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send Initial Context Setup Response")
 
@@ -161,9 +161,9 @@ func SendInitialContextSetupResponse(
 func SendInitialContextSetupFailure(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	cause ngapType.Cause,
-	failedList *ngapType.PDUSessionResourceFailedToSetupListCxtFail,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	cause ie.Cause,
+	failedList *ie.PDUSessionResourceFailedToSetupListCxtFail,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send Initial Context Setup Failure")
 
@@ -191,7 +191,7 @@ func SendInitialContextSetupFailure(
 func SendUEContextModificationResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send UE Context Modification Response")
 
@@ -213,8 +213,8 @@ func SendUEContextModificationResponse(
 func SendUEContextModificationFailure(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	cause ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	cause ie.Cause,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send UE Context Modification Failure")
 
@@ -236,7 +236,7 @@ func SendUEContextModificationFailure(
 func SendUEContextReleaseComplete(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send UE Context Release Complete")
 
@@ -257,7 +257,7 @@ func SendUEContextReleaseComplete(
 
 func SendUEContextReleaseRequest(
 	amf *context.TNGFAMF,
-	ue *context.TNGFUe, cause ngapType.Cause,
+	ue *context.TNGFUe, cause ie.Cause,
 ) {
 	ngaplog.Infoln("[TNGF] Send UE Context Release Request")
 
@@ -330,7 +330,7 @@ func SendNASNonDeliveryIndication(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
 	nasPdu []byte,
-	cause ngapType.Cause,
+	cause ie.Cause,
 ) {
 	ngaplog.Infoln("[TNGF] Send NAS NonDelivery Indication")
 
@@ -362,9 +362,9 @@ func SendRerouteNASRequest() {
 func SendPDUSessionResourceSetupResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceSetupListSURes,
-	failedListSURes *ngapType.PDUSessionResourceFailedToSetupListSURes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	responseList *ie.PDUSessionResourceSetupListSURes,
+	failedListSURes *ie.PDUSessionResourceFailedToSetupListSURes,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send PDU Session Resource Setup Response")
 
@@ -392,9 +392,9 @@ func SendPDUSessionResourceSetupResponse(
 func SendPDUSessionResourceModifyResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	responseList *ngapType.PDUSessionResourceModifyListModRes,
-	failedList *ngapType.PDUSessionResourceFailedToModifyListModRes,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	responseList *ie.PDUSessionResourceModifyListModRes,
+	failedList *ie.PDUSessionResourceFailedToModifyListModRes,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send PDU Session Resource Modify Response")
 
@@ -422,7 +422,7 @@ func SendPDUSessionResourceModifyResponse(
 func SendPDUSessionResourceModifyIndication(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	modifyList []ngapType.PDUSessionResourceModifyItemModInd,
+	modifyList []ie.PDUSessionResourceModifyItemModInd,
 ) {
 	ngaplog.Infoln("[TNGF] Send PDU Session Resource Modify Indication")
 
@@ -455,8 +455,8 @@ func SendPDUSessionResourceModifyIndication(
 func SendPDUSessionResourceNotify(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	notiList *ngapType.PDUSessionResourceNotifyList,
-	relList *ngapType.PDUSessionResourceReleasedListNot,
+	notiList *ie.PDUSessionResourceNotifyList,
+	relList *ie.PDUSessionResourceReleasedListNot,
 ) {
 	ngaplog.Infoln("[TNGF] Send PDU Session Resource Notify")
 
@@ -484,8 +484,8 @@ func SendPDUSessionResourceNotify(
 func SendPDUSessionResourceReleaseResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	relList ngapType.PDUSessionResourceReleasedListRelRes,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	relList ie.PDUSessionResourceReleasedListRelRes,
+	diagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send PDU Session Resource Release Response")
 
@@ -519,8 +519,8 @@ func SendErrorIndication(
 	amf *context.TNGFAMF,
 	amfUENGAPID *int64,
 	ranUENGAPID *int64,
-	cause *ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	cause *ie.Cause,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send Error Indication")
 
@@ -554,8 +554,8 @@ func SendErrorIndicationWithSctpConn(
 	sctpConn *sctp.SCTPConn,
 	amfUENGAPID *int64,
 	ranUENGAPID *int64,
-	cause *ngapType.Cause,
-	criticalityDiagnostics *ngapType.CriticalityDiagnostics,
+	cause *ie.Cause,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send Error Indication")
 
@@ -598,7 +598,7 @@ func SendUERadioCapabilityInfoIndication() {
 func SendUERadioCapabilityCheckResponse(
 	amf *context.TNGFAMF,
 	ue *context.TNGFUe,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	diagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send UE Radio Capability Check Response")
 
@@ -618,9 +618,9 @@ func SendUERadioCapabilityCheckResponse(
 
 func SendAMFConfigurationUpdateAcknowledge(
 	amf *context.TNGFAMF,
-	setupList *ngapType.AMFTNLAssociationSetupList,
-	failList *ngapType.TNLAssociationList,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	setupList *ie.AMFTNLAssociationSetupList,
+	failList *ie.TNLAssociationList,
+	diagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send AMF Configuration Update Acknowledge")
 
@@ -641,9 +641,9 @@ func SendAMFConfigurationUpdateAcknowledge(
 
 func SendAMFConfigurationUpdateFailure(
 	amf *context.TNGFAMF,
-	ngCause ngapType.Cause,
-	time *ngapType.TimeToWait,
-	diagnostics *ngapType.CriticalityDiagnostics,
+	ngCause ie.Cause,
+	time *ie.TimeToWait,
+	diagnostics *ie.CriticalityDiagnostics,
 ) {
 	ngaplog.Infoln("[TNGF] Send AMF Configuration Update Failure")
 

@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/free5gc/aper"
-	"github.com/free5gc/nas/nasType"
-	"github.com/free5gc/ngap/ngapType"
+	nasie "github.com/free5gc/nas/ie"
+	"github.com/free5gc/ngap/aper"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/tngf/pkg/radius/message"
 )
 
@@ -14,11 +14,12 @@ import (
 
 // Access Network Parameters
 type ANParameters struct {
-	GUAMI              *ngapType.GUAMI
-	SelectedPLMNID     *ngapType.PLMNIdentity
-	RequestedNSSAI     *ngapType.AllowedNSSAI
-	EstablishmentCause *ngapType.RRCEstablishmentCause
-	UEIdentity         *nasType.MobileIdentity5GS
+	GUAMI              *ie.GUAMI
+	SelectedPLMNID     *ie.PLMNIdentity
+	RequestedNSSAI     *ie.AllowedNSSAI
+	EstablishmentCause *ie.RRCEstablishmentCause
+	UEIdentity         *nasie.MobileId5GS
+	UEIdentityRaw      []byte
 }
 
 func UnmarshalEAP5GData(codedData []byte) (
@@ -89,8 +90,8 @@ func UnmarshalEAP5GData(codedData []byte) (
 							guamiField := make([]byte, 1)
 							guamiField = append(guamiField, parameterValue...)
 							// Decode GUAMI using aper
-							ngapGUAMI := new(ngapType.GUAMI)
-							unmarshal_err := aper.UnmarshalWithParams(guamiField, ngapGUAMI, "valueExt")
+							ngapGUAMI := new(ie.GUAMI)
+							unmarshal_err := ngapGUAMI.Read(aper.NewPerBitData(guamiField))
 							if unmarshal_err != nil {
 								radiusLog.Errorf("APER unmarshal with parameter failed: %+v", unmarshal_err)
 								return 0, nil, nil, errors.New("unmarshal failed when decoding GUAMI")
@@ -123,8 +124,8 @@ func UnmarshalEAP5GData(codedData []byte) (
 							plmnField := make([]byte, 1)
 							plmnField = append(plmnField, parameterValue...)
 							// Decode PLMN using aper
-							ngapPLMN := new(ngapType.PLMNIdentity)
-							unmarshal_err := aper.UnmarshalWithParams(plmnField, ngapPLMN, "valueExt")
+							ngapPLMN := new(ie.PLMNIdentity)
+							unmarshal_err := ngapPLMN.Read(aper.NewPerBitData(plmnField))
 							if unmarshal_err != nil {
 								radiusLog.Errorf("APER unmarshal with parameter failed: %v", unmarshal_err)
 								return 0, nil, nil, errors.New("unmarshal failed when decoding PLMN")
@@ -147,7 +148,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 								parameterValue = parameterValue[:parameterLength]
 							}
 
-							ngapNSSAI := new(ngapType.AllowedNSSAI)
+							ngapNSSAI := new(ie.AllowedNSSAI)
 
 							// [TS 24501 f30] 9.11.2.8 S-NSSAI
 							// s-nssai(LV) consists of
@@ -165,20 +166,20 @@ func UnmarshalEAP5GData(codedData []byte) (
 									snssaiValue = snssaiValue[:snssaiLength]
 								}
 
-								ngapSNSSAIItem := ngapType.AllowedNSSAIItem{}
+								ngapSNSSAIItem := ie.AllowedNSSAIItem{}
 
 								if len(snssaiValue) == 1 {
-									ngapSNSSAIItem.SNSSAI = ngapType.SNSSAI{
-										SST: ngapType.SST{
+									ngapSNSSAIItem.SNSSAI = &ie.SNSSAI{
+										SST: &ie.SST{
 											Value: []byte{snssaiValue[0]},
 										},
 									}
 								} else if len(snssaiValue) == 4 {
-									ngapSNSSAIItem.SNSSAI = ngapType.SNSSAI{
-										SST: ngapType.SST{
+									ngapSNSSAIItem.SNSSAI = &ie.SNSSAI{
+										SST: &ie.SST{
 											Value: []byte{snssaiValue[0]},
 										},
-										SD: &ngapType.SD{
+										SD: &ie.SD{
 											Value: []byte{snssaiValue[1], snssaiValue[2], snssaiValue[3]},
 										},
 									}
@@ -242,7 +243,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 								establishmentCause = message.EstablishmentCauseMO_Data
 							}
 
-							ngapEstablishmentCause := new(ngapType.RRCEstablishmentCause)
+							ngapEstablishmentCause := new(ie.RRCEstablishmentCause)
 							ngapEstablishmentCause.Value = aper.Enumerated(establishmentCause)
 
 							anParameters.EstablishmentCause = ngapEstablishmentCause
@@ -281,9 +282,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 								return 0, nil, nil, errors.New("invalid UEIdentity parameter: missing IEI/length")
 							}
 
-							var iei uint8
 							var valLen uint16
-							iei = parameterValue[0]
 							valLen = binary.BigEndian.Uint16(parameterValue[1:3])
 
 							mobileIdentityContents := parameterValue[3:]
@@ -291,11 +290,13 @@ func UnmarshalEAP5GData(codedData []byte) (
 								return 0, nil, nil, errors.New("invalid UEIdentity parameter: length mismatch")
 							}
 
-							ueIdentity := nasType.NewMobileIdentity5GS(iei)
-							ueIdentity.SetLen(valLen)
-							ueIdentity.SetMobileIdentity5GSContents(mobileIdentityContents)
+							ueIdentity := new(nasie.MobileId5GS)
+							if err := ueIdentity.UnmarshalBinary(mobileIdentityContents); err != nil {
+								return 0, nil, nil, errors.New("unmarshal failed when decoding UEIdentity")
+							}
 
 							anParameters.UEIdentity = ueIdentity
+							anParameters.UEIdentityRaw = append([]byte(nil), mobileIdentityContents...)
 						} else {
 							radiusLog.Warn("AN-Parameter UE Identity field empty")
 						}

@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/free5gc/aper"
-	"github.com/free5gc/ngap/ngapType"
+	"github.com/free5gc/ngap/aper"
+	"github.com/free5gc/ngap/ie"
 	"github.com/free5gc/tngf/pkg/context"
 )
 
@@ -21,23 +21,21 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 		t.Fatalf("BuildPDUSessionResourceSetupResponseTransfer() error = %v", err)
 	}
 
-	responseList := &ngapType.PDUSessionResourceSetupListSURes{
-		List: []ngapType.PDUSessionResourceSetupItemSURes{
+	responseList := &ie.PDUSessionResourceSetupListSURes{
+		List: []ie.PDUSessionResourceSetupItemSURes{
 			{
-				PDUSessionID: ngapType.PDUSessionID{Value: 10},
-				PDUSessionResourceSetupResponseTransfer: aper.OctetString(
-					setupTransfer,
-				),
+				PDUSessionID:                            &ie.PDUSessionID{Value: 10},
+				PDUSessionResourceSetupResponseTransfer: octetString(setupTransfer),
 			},
 		},
 	}
 
-	allowedNSSAI := &ngapType.AllowedNSSAI{
-		List: []ngapType.AllowedNSSAIItem{
+	allowedNSSAI := &ie.AllowedNSSAI{
+		List: []ie.AllowedNSSAIItem{
 			{
-				SNSSAI: ngapType.SNSSAI{
-					SST: ngapType.SST{Value: aper.OctetString{0x01}},
-					SD:  &ngapType.SD{Value: aper.OctetString{0x11, 0x22, 0x33}},
+				SNSSAI: &ie.SNSSAI{
+					SST: &ie.SST{Value: aper.OctetString{0x01}},
+					SD:  &ie.SD{Value: aper.OctetString{0x11, 0x22, 0x33}},
 				},
 			},
 		},
@@ -49,8 +47,9 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 		build       func() ([]byte, error)
 	}{
 		{
-			name:        "BuildNGSetupRequest",
-			expectedHex: "0015003b000003001b000ec000f000090002f83900010203040052400e0580667265653547435f544e47460066001000000000010002f83900001008010203",
+			name: "BuildNGSetupRequest",
+			// The generated message API enforces the mandatory DefaultPagingDRX IE.
+			expectedHex: "00150040000004001b000ec000f000090002f83900010203040052400e0580667265653547435f544e47460066001000000000010002f839000010080102030015400140",
 			build:       BuildNGSetupRequest,
 		},
 		{
@@ -61,15 +60,17 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 			},
 		},
 		{
-			name:        "BuildInitialUEMessage",
-			expectedHex: "000f403500000500550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a0001180070400100",
+			name: "BuildInitialUEMessage",
+			// The generated API uses the specification-defined Ignore criticality for RRC establishment cause.
+			expectedHex: "000f403500000500550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a4001180070400100",
 			build: func() ([]byte, error) {
 				return BuildInitialUEMessage(ue, nasPdu, nil)
 			},
 		},
 		{
-			name:        "BuildInitialUEMessageWithGUTIAndAllowedNSSAI",
-			expectedHex: "000f404f00000800550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a000118001a00070080c0010203040003400202000070400100000040050201112233",
+			name: "BuildInitialUEMessageWithGUTIAndAllowedNSSAI",
+			// See the RRC establishment-cause criticality review above.
+			expectedHex: "000f404f00000800550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a400118001a00070080c0010203040003400202000070400100000000050201112233",
 			build: func() ([]byte, error) {
 				ueWithGUTI := *ue
 				ueWithGUTI.Guti = "2089301020301020304"
@@ -175,11 +176,15 @@ func testPDUSession() *context.PDUSession {
 	}
 }
 
-func testCause() ngapType.Cause {
-	return ngapType.Cause{
-		Present: ngapType.CausePresentRadioNetwork,
-		RadioNetwork: &ngapType.CauseRadioNetwork{
-			Value: ngapType.CauseRadioNetworkPresentUserInactivity,
+func octetString(value []byte) *aper.OctetString {
+	encoded := aper.OctetString(value)
+	return &encoded
+}
+
+func testCause() ie.Cause {
+	return ie.Cause{
+		Choice: &ie.CauseRadioNetwork{
+			Value: ie.CauseRadioNetworkPresentUserInactivity,
 		},
 	}
 }
