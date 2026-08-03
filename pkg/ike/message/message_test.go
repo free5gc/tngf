@@ -442,3 +442,56 @@ func TestEncodeDecodeUsingPublicData(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+// TestSecurityAssociationUnmarshalMalformedSPI verifies that a Security
+// Association payload whose SPI region does not fit inside the declared
+// proposal length is rejected with an error instead of panicking on an
+// out-of-bounds slice.
+func TestSecurityAssociationUnmarshalMalformedSPI(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload []byte
+	}{
+		{
+			// payload len=22; proposalLength=8 but spiSize=10 -> rawData[18:8] panics pre-fix
+			name: "spi size exceeds proposal length",
+			payload: []byte{
+				0x00, 0x00, 0x00, 0x16,
+				0x00, 0x00, 0x00, 0x08,
+				0x01, 0x01, 0x0a, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00,
+			},
+		},
+		{
+			// payload len=13; proposalLength=8, spiSize=1 -> rawData[9:8] panics pre-fix
+			name: "minimal spi overflow",
+			payload: []byte{
+				0x00, 0x00, 0x00, 0x0d,
+				0x00, 0x00, 0x00, 0x08,
+				0x01, 0x01, 0x01, 0x00,
+				0x00,
+			},
+		},
+		{
+			// payload len=13; proposalLength=8, spiSize=0xf8 (248). uint8(8+248)=0,
+			// so a naive guard/slice computes rawData[8:0] and panics. This is the
+			// byte-overflow boundary (248-255) a plain int guard on the SPI-size check misses.
+			name: "spi size byte overflow",
+			payload: []byte{
+				0x00, 0x00, 0x00, 0x0d,
+				0x00, 0x00, 0x00, 0x08,
+				0x01, 0x01, 0xf8, 0x00,
+				0x00,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var container message.IKEPayloadContainer
+			if err := container.Decode(message.TypeSA, tt.payload); err == nil {
+				t.Fatalf("expected error for malformed SA payload, got nil")
+			}
+		})
+	}
+}

@@ -373,15 +373,23 @@ func (securityAssociation *SecurityAssociation) unmarshal(rawData []byte) error 
 		proposal.ProtocolID = rawData[5]
 
 		spiSize := rawData[6]
+		// spiSize is a uint8, so 8+spiSize overflows for spiSize >= 248; promote to int
+		// once and use it for every subsequent bound/slice to avoid a wrapped index.
+		spiEnd := 8 + int(spiSize)
 		if spiSize > 0 {
 			// bounds checking
-			if len(rawData) < int(8+spiSize) {
+			if len(rawData) < spiEnd {
 				return errors.New("Proposal: No sufficient bytes for unmarshalling SPI of proposal")
 			}
-			proposal.SPI = append(proposal.SPI, rawData[8:8+spiSize]...)
+			proposal.SPI = append(proposal.SPI, rawData[8:spiEnd]...)
 		}
 
-		transformData = rawData[8+spiSize : proposalLength]
+		// bounds checking
+		if spiEnd > int(proposalLength) {
+			return fmt.Errorf("Proposal: SPI size %d exceeds proposal length %d", spiSize, proposalLength)
+		}
+
+		transformData = rawData[spiEnd:proposalLength]
 
 		for len(transformData) > 0 {
 			// bounds checking
