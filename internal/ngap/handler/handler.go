@@ -68,7 +68,7 @@ func HandleNGSetupResponse(sctpAddr string, conn *sctp.SCTPConn, message *ngapMe
 	if len(iesCriticalityDiagnostics.List) != 0 {
 		ngapLog.Traceln("[NGAP] Sending error indication to AMF, because some mandatory IEs were not included")
 		cause = buildCause(&ie.CauseProtocol{Value: ie.CauseProtocolPresentAbstractSyntaxErrorReject})
-		procedureCode := int64(ngapMessage.ProcedureCodeNGSetup)
+		procedureCode := ngapMessage.ProcedureCodeNGSetup
 		triggeringMessage := aper.Enumerated(ngapMessage.MessageTypeSuccessfulOutcome)
 		procedureCriticality := ie.CriticalityPresentReject
 		criticalityDiagnostics := buildCriticalityDiagnostics(
@@ -821,7 +821,7 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 			OutgoingTEID: binary.BigEndian.Uint32(gtpTunnel.GTPTEID.Value),
 		}
 
-		if userPlaneConnection, ok := tngfSelf.GTPConnectionWithUPFLoad(upfIPv4); ok {
+		if userPlaneConnection, found := tngfSelf.GTPConnectionWithUPFLoad(upfIPv4); found {
 			// UPF UDP address
 			upfUDPAddr, err := net.ResolveUDPAddr("udp", upfIPv4+":2152")
 			if err != nil {
@@ -1318,8 +1318,11 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapMes
 	}{
 		{ie.ProtocolIEIDAMFUENGAPID, "AMFUENGAPID", amfUeNgapID == nil},
 		{ie.ProtocolIEIDRANUENGAPID, "RANUENGAPID", ranUeNgapID == nil},
-		{ie.ProtocolIEIDPDUSessionResourceSetupListSUReq, "PDUSessionResourceSetupListSUReq",
-			pduSessionResourceSetupListSUReq == nil},
+		{
+			ie.ProtocolIEIDPDUSessionResourceSetupListSUReq,
+			"PDUSessionResourceSetupListSUReq",
+			pduSessionResourceSetupListSUReq == nil,
+		},
 	} {
 		if requiredIE.isNil {
 			ngapLog.Errorf("%s is nil", requiredIE.name)
@@ -1976,7 +1979,10 @@ func HandlePDUSessionResourceModifyConfirm(amf *context.TNGFAMF, message *ngapMe
 	// metricStatusOk = true
 }
 
-func HandlePDUSessionResourceReleaseCommand(amf *context.TNGFAMF, message *ngapMessage.PDUSessionResourceReleaseCommand) {
+func HandlePDUSessionResourceReleaseCommand(
+	amf *context.TNGFAMF,
+	message *ngapMessage.PDUSessionResourceReleaseCommand,
+) {
 	ngapLog.Infoln("[TNGF] Handle PDU Session Resource Release Command")
 	// var aMFUENGAPID *ngapType.AMFUENGAPID
 	// var rANUENGAPID *ngapType.RANUENGAPID
@@ -2396,7 +2402,10 @@ func HandleAMFConfigurationUpdate(amf *context.TNGFAMF, message *ngapMessage.AMF
 	// metricStatusOk = true
 }
 
-func HandleRANConfigurationUpdateAcknowledge(amf *context.TNGFAMF, message *ngapMessage.RANConfigurationUpdateAcknowledge) {
+func HandleRANConfigurationUpdateAcknowledge(
+	amf *context.TNGFAMF,
+	message *ngapMessage.RANConfigurationUpdateAcknowledge,
+) {
 	ngapLog.Infoln("[TNGF] Handle RAN Configuration Update Acknowledge")
 
 	// var criticalityDiagnostics *ngapType.CriticalityDiagnostics

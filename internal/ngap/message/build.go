@@ -501,17 +501,17 @@ func BuildInitialUEMessage(
 	}
 
 	if ue.Guti != "" {
-		amfID, tmsi, err := splitGUTI(ue.Guti)
-		if err != nil {
-			return nil, err
+		amfID, tmsi, gutiErr := splitGUTI(ue.Guti)
+		if gutiErr != nil {
+			return nil, gutiErr
 		}
-		amfSetID, amfPointer, err := amfIDToNGAP(amfID)
-		if err != nil {
-			return nil, err
+		amfSetID, amfPointer, amfIDErr := amfIDToNGAP(amfID)
+		if amfIDErr != nil {
+			return nil, amfIDErr
 		}
-		tmsiBytes, err := hex.DecodeString(tmsi)
-		if err != nil {
-			return nil, fmt.Errorf("decode 5G-TMSI: %w", err)
+		tmsiBytes, tmsiErr := hex.DecodeString(tmsi)
+		if tmsiErr != nil {
+			return nil, fmt.Errorf("decode 5G-TMSI: %w", tmsiErr)
 		}
 		message.FiveGSTMSI = &ie.FiveGSTMSI{
 			AMFSetID:   &ie.AMFSetID{Value: amfSetID},
@@ -1384,15 +1384,15 @@ func buildSupportedTAList(items []context.SupportedTAItem) (*ie.SupportedTAList,
 				TAISliceSupportList: &ie.SliceSupportList{},
 			}
 			for _, slice := range broadcast.TAISliceSupportList {
-				sst, err := hex.DecodeString(slice.SNSSAI.SST)
-				if err != nil {
-					return nil, fmt.Errorf("decode S-NSSAI SST: %w", err)
+				sst, sstErr := hex.DecodeString(slice.SNSSAI.SST)
+				if sstErr != nil {
+					return nil, fmt.Errorf("decode S-NSSAI SST: %w", sstErr)
 				}
 				snssai := &ie.SNSSAI{SST: &ie.SST{Value: sst}}
 				if slice.SNSSAI.SD != "" {
-					sd, err := hex.DecodeString(slice.SNSSAI.SD)
-					if err != nil {
-						return nil, fmt.Errorf("decode S-NSSAI SD: %w", err)
+					sd, sdErr := hex.DecodeString(slice.SNSSAI.SD)
+					if sdErr != nil {
+						return nil, fmt.Errorf("decode S-NSSAI SD: %w", sdErr)
 					}
 					snssai.SD = &ie.SD{Value: sd}
 				}

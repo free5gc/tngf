@@ -282,8 +282,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 								return 0, nil, nil, errors.New("invalid UEIdentity parameter: missing IEI/length")
 							}
 
-							var valLen uint16
-							valLen = binary.BigEndian.Uint16(parameterValue[1:3])
+							valLen := binary.BigEndian.Uint16(parameterValue[1:3])
 
 							mobileIdentityContents := parameterValue[3:]
 							if int(valLen) != len(mobileIdentityContents) {
@@ -291,7 +290,7 @@ func UnmarshalEAP5GData(codedData []byte) (
 							}
 
 							ueIdentity := new(nasie.MobileId5GS)
-							if err := ueIdentity.UnmarshalBinary(mobileIdentityContents); err != nil {
+							if decodeErr := ueIdentity.UnmarshalBinary(mobileIdentityContents); decodeErr != nil {
 								return 0, nil, nil, errors.New("unmarshal failed when decoding UEIdentity")
 							}
 

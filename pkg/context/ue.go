@@ -85,11 +85,12 @@ type TNGFUe struct {
 	RadiusConnection *UDPSocketInfo
 
 	/* Others */
-	Guami                            *ie.GUAMI
-	IndexToRfsp                      int64
-	Ambr                             *ie.UEAggregateMaximumBitRate
-	AllowedNssai                     *ie.AllowedNSSAI
-	RadioCapability                  *ie.UERadioCapability                           // TODO: This is for RRC, can be deleted
+	Guami        *ie.GUAMI
+	IndexToRfsp  int64
+	Ambr         *ie.UEAggregateMaximumBitRate
+	AllowedNssai *ie.AllowedNSSAI
+	// TODO: This is for RRC, can be deleted.
+	RadioCapability                  *ie.UERadioCapability
 	CoreNetworkAssistanceInformation *ie.CoreNetworkAssistanceInformationForInactive // TS 38.413 9.3.1.15
 	IMSVoiceSupported                int32
 	RRCEstablishmentCause            int16

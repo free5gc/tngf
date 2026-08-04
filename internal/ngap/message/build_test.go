@@ -1,4 +1,4 @@
-package message
+package message_test
 
 import (
 	"encoding/hex"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/free5gc/ngap/aper"
 	"github.com/free5gc/ngap/ie"
+	ngap_message "github.com/free5gc/tngf/internal/ngap/message"
 	"github.com/free5gc/tngf/pkg/context"
 )
 
@@ -16,7 +17,7 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 	cause := testCause()
 	pduSession := testPDUSession()
 
-	setupTransfer, err := BuildPDUSessionResourceSetupResponseTransfer(pduSession)
+	setupTransfer, err := ngap_message.BuildPDUSessionResourceSetupResponseTransfer(pduSession)
 	if err != nil {
 		t.Fatalf("BuildPDUSessionResourceSetupResponseTransfer() error = %v", err)
 	}
@@ -49,69 +50,73 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 		{
 			name: "BuildNGSetupRequest",
 			// The generated message API enforces the mandatory DefaultPagingDRX IE.
-			expectedHex: "00150040000004001b000ec000f000090002f83900010203040052400e0580667265653547435f544e47460066001000000000010002f839000010080102030015400140",
-			build:       BuildNGSetupRequest,
+			expectedHex: "00150040000004001b000ec000f000090002f83900010203040052400e0580667265653547435f" +
+				"544e47460066001000000000010002f839000010080102030015400140",
+			build: ngap_message.BuildNGSetupRequest,
 		},
 		{
 			name:        "BuildInitialContextSetupResponse",
 			expectedHex: "200e0010000002000a40032001c800554002007b",
 			build: func() ([]byte, error) {
-				return BuildInitialContextSetupResponse(ue, nil, nil, nil)
+				return ngap_message.BuildInitialContextSetupResponse(ue, nil, nil, nil)
 			},
 		},
 		{
 			name: "BuildInitialUEMessage",
 			// The generated API uses the specification-defined Ignore criticality for RRC establishment cause.
-			expectedHex: "000f403500000500550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a4001180070400100",
+			expectedHex: "000f403500000500550002007b00260007067e004101020300790013c000f4400e00060304050607080" +
+				"f80c0000201005a4001180070400100",
 			build: func() ([]byte, error) {
-				return BuildInitialUEMessage(ue, nasPdu, nil)
+				return ngap_message.BuildInitialUEMessage(ue, nasPdu, nil)
 			},
 		},
 		{
 			name: "BuildInitialUEMessageWithGUTIAndAllowedNSSAI",
 			// See the RRC establishment-cause criticality review above.
-			expectedHex: "000f404f00000800550002007b00260007067e004101020300790013c000f4400e00060304050607080f80c0000201005a400118001a00070080c0010203040003400202000070400100000000050201112233",
+			expectedHex: "000f404f00000800550002007b00260007067e004101020300790013c000f4400e00060304050607080" +
+				"f80c0000201005a400118001a00070080c0010203040003400202000070400100000000050201112233",
 			build: func() ([]byte, error) {
 				ueWithGUTI := *ue
 				ueWithGUTI.Guti = "2089301020301020304"
-				return BuildInitialUEMessage(&ueWithGUTI, nasPdu, allowedNSSAI)
+				return ngap_message.BuildInitialUEMessage(&ueWithGUTI, nasPdu, allowedNSSAI)
 			},
 		},
 		{
-			name:        "BuildUplinkNASTransport",
-			expectedHex: "002e4032000004000a00032001c800550002007b00260007067e004101020300794013c000f4400e00060304050607080f80c0000201",
+			name: "BuildUplinkNASTransport",
+			expectedHex: "002e4032000004000a00032001c800550002007b00260007067e004101020300794013c000f4400e000603040506" +
+				"07080f80c0000201",
 			build: func() ([]byte, error) {
-				return BuildUplinkNASTransport(ue, nasPdu)
+				return ngap_message.BuildUplinkNASTransport(ue, nasPdu)
 			},
 		},
 		{
 			name:        "BuildPDUSessionResourceSetupResponse",
 			expectedHex: "201d0027000003000a40032001c800554002007b004b401300000a0f0003e00a0000010102030404010240",
 			build: func() ([]byte, error) {
-				return BuildPDUSessionResourceSetupResponse(ue, responseList, nil, nil)
+				return ngap_message.BuildPDUSessionResourceSetupResponse(ue, responseList, nil, nil)
 			},
 		},
 		{
 			name:        "BuildPDUSessionResourceSetupResponseTransfer",
 			expectedHex: "0003e00a0000010102030404010240",
 			build: func() ([]byte, error) {
-				return BuildPDUSessionResourceSetupResponseTransfer(pduSession)
+				return ngap_message.BuildPDUSessionResourceSetupResponseTransfer(pduSession)
 			},
 		},
 		{
 			name:        "BuildPDUSessionResourceSetupUnsuccessfulTransfer",
 			expectedHex: "00a0",
 			build: func() ([]byte, error) {
-				return BuildPDUSessionResourceSetupUnsuccessfulTransfer(cause, nil)
+				return ngap_message.BuildPDUSessionResourceSetupUnsuccessfulTransfer(cause, nil)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.build()
-			if err != nil {
-				t.Fatalf("%s() error = %v", tt.name, err)
+			got, buildErr := tt.build()
+			if buildErr != nil {
+				t.Fatalf("%s() error = %v", tt.name, buildErr)
 			}
 			if gotHex := hex.EncodeToString(got); gotHex != tt.expectedHex {
 				t.Fatalf("%s() = %s, want %s", tt.name, gotHex, tt.expectedHex)
