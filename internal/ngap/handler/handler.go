@@ -419,24 +419,41 @@ func HandleInitialContextSetupRequest(amf *context.TNGFAMF, message *ngapMessage
 	// nasPDU = message.NASPDU
 	emergencyFallbackIndicator = message.EmergencyFallbackIndicator
 
-	for _, requiredIE := range []struct {
-		id    int64
-		name  string
-		isNil bool
-	}{
-		{ie.ProtocolIEIDAMFUENGAPID, "AMFUENGAPID", amfUeNgapID == nil},
-		{ie.ProtocolIEIDRANUENGAPID, "RANUENGAPID", ranUeNgapID == nil},
-		{ie.ProtocolIEIDGUAMI, "GUAMI", guami == nil},
-		{ie.ProtocolIEIDAllowedNSSAI, "AllowedNSSAI", allowedNSSAI == nil},
-		{ie.ProtocolIEIDUESecurityCapabilities, "UESecurityCapabilities", ueSecurityCapabilities == nil},
-		{ie.ProtocolIEIDSecurityKey, "SecurityKey", securityKey == nil},
-	} {
-		if requiredIE.isNil {
-			ngapLog.Errorf("%s is nil", requiredIE.name)
-			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
-				buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, requiredIE.id,
-					ie.TypeOfErrorPresentMissing))
-		}
+	if amfUeNgapID == nil {
+		ngapLog.Error("AMFUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDAMFUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if ranUeNgapID == nil {
+		ngapLog.Error("RANUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDRANUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if guami == nil {
+		ngapLog.Error("GUAMI is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDGUAMI,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if allowedNSSAI == nil {
+		ngapLog.Error("AllowedNSSAI is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDAllowedNSSAI,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if ueSecurityCapabilities == nil {
+		ngapLog.Error("UESecurityCapabilities is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDUESecurityCapabilities,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if securityKey == nil {
+		ngapLog.Error("SecurityKey is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDSecurityKey,
+				ie.TypeOfErrorPresentMissing))
 	}
 	if coreNetworkAssistanceInformation != nil {
 		ngapLog.Warnln("Not Supported IE [CoreNetworkAssistanceInformation]")
@@ -683,39 +700,41 @@ func handlePDUSessionResourceSetupRequestTransfer(ue *context.TNGFUe, pduSession
 
 	if transfer.ProtocolIEs != nil {
 		for _, protocolIE := range transfer.ProtocolIEs.List {
-			if protocolIE.PDUSessionAggregateMaximumBitRate != nil {
+			protocolIEID := protocolIE.Id()
+			if protocolIEID == nil {
+				continue
+			}
+
+			switch protocolIEID.Value {
+			case ie.ProtocolIEIDPDUSessionAggregateMaximumBitRate:
 				pduSessionAMBR = protocolIE.PDUSessionAggregateMaximumBitRate
-			}
-			if protocolIE.ULNGUUPTNLInformation != nil {
+			case ie.ProtocolIEIDULNGUUPTNLInformation:
 				ulNGUUPTNLInformation = protocolIE.ULNGUUPTNLInformation
-			}
-			if protocolIE.PDUSessionType != nil {
+			case ie.ProtocolIEIDPDUSessionType:
 				pduSessionType = protocolIE.PDUSessionType
-			}
-			if protocolIE.SecurityIndication != nil {
+			case ie.ProtocolIEIDSecurityIndication:
 				securityIndication = protocolIE.SecurityIndication
-			}
-			if protocolIE.NetworkInstance != nil {
+			case ie.ProtocolIEIDNetworkInstance:
 				networkInstance = protocolIE.NetworkInstance
-			}
-			if protocolIE.QosFlowSetupRequestList != nil {
+			case ie.ProtocolIEIDQosFlowSetupRequestList:
 				qosFlowSetupRequestList = protocolIE.QosFlowSetupRequestList
 			}
 		}
 	}
-	for _, requiredIE := range []struct {
-		id    int64
-		isNil bool
-	}{
-		{ie.ProtocolIEIDULNGUUPTNLInformation, ulNGUUPTNLInformation == nil},
-		{ie.ProtocolIEIDPDUSessionType, pduSessionType == nil},
-		{ie.ProtocolIEIDQosFlowSetupRequestList, qosFlowSetupRequestList == nil},
-	} {
-		if requiredIE.isNil {
-			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
-				buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, requiredIE.id,
-					ie.TypeOfErrorPresentMissing))
-		}
+	if ulNGUUPTNLInformation == nil {
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject,
+				ie.ProtocolIEIDULNGUUPTNLInformation, ie.TypeOfErrorPresentMissing))
+	}
+	if pduSessionType == nil {
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject,
+				ie.ProtocolIEIDPDUSessionType, ie.TypeOfErrorPresentMissing))
+	}
+	if qosFlowSetupRequestList == nil {
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject,
+				ie.ProtocolIEIDQosFlowSetupRequestList, ie.TypeOfErrorPresentMissing))
 	}
 
 	if len(iesCriticalityDiagnostics.List) > 0 {
@@ -1172,21 +1191,23 @@ func HandleDownlinkNASTransport(amf *context.TNGFAMF, message *ngapMessage.Downl
 	indexToRFSP = message.IndexToRFSP
 	ueAggregateMaximumBitRate = message.UEAggregateMaximumBitRate
 	allowedNSSAI = message.AllowedNSSAI
-	for _, requiredIE := range []struct {
-		id    int64
-		name  string
-		isNil bool
-	}{
-		{ie.ProtocolIEIDAMFUENGAPID, "AMFUENGAPID", amfUeNgapID == nil},
-		{ie.ProtocolIEIDRANUENGAPID, "RANUENGAPID", ranUeNgapID == nil},
-		{ie.ProtocolIEIDNASPDU, "NASPDU", nasPDU == nil},
-	} {
-		if requiredIE.isNil {
-			ngapLog.Errorf("%s is nil", requiredIE.name)
-			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
-				buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, requiredIE.id,
-					ie.TypeOfErrorPresentMissing))
-		}
+	if amfUeNgapID == nil {
+		ngapLog.Error("AMFUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDAMFUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if ranUeNgapID == nil {
+		ngapLog.Error("RANUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDRANUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if nasPDU == nil {
+		ngapLog.Error("NASPDU is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDNASPDU,
+				ie.TypeOfErrorPresentMissing))
 	}
 	if len(iesCriticalityDiagnostics.List) != 0 {
 		ngapLog.Error("Downlink NAS Transport is missing a mandatory IE")
@@ -1311,25 +1332,23 @@ func HandlePDUSessionResourceSetupRequest(amf *context.TNGFAMF, message *ngapMes
 	if amfUeNgapID != nil {
 		tngfUe = amf.FindUeByAmfUeNgapID(amfUeNgapID.Value)
 	}
-	for _, requiredIE := range []struct {
-		id    int64
-		name  string
-		isNil bool
-	}{
-		{ie.ProtocolIEIDAMFUENGAPID, "AMFUENGAPID", amfUeNgapID == nil},
-		{ie.ProtocolIEIDRANUENGAPID, "RANUENGAPID", ranUeNgapID == nil},
-		{
-			ie.ProtocolIEIDPDUSessionResourceSetupListSUReq,
-			"PDUSessionResourceSetupListSUReq",
-			pduSessionResourceSetupListSUReq == nil,
-		},
-	} {
-		if requiredIE.isNil {
-			ngapLog.Errorf("%s is nil", requiredIE.name)
-			iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
-				buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, requiredIE.id,
-					ie.TypeOfErrorPresentMissing))
-		}
+	if amfUeNgapID == nil {
+		ngapLog.Error("AMFUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDAMFUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if ranUeNgapID == nil {
+		ngapLog.Error("RANUENGAPID is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject, ie.ProtocolIEIDRANUENGAPID,
+				ie.TypeOfErrorPresentMissing))
+	}
+	if pduSessionResourceSetupListSUReq == nil {
+		ngapLog.Error("PDUSessionResourceSetupListSUReq is nil")
+		iesCriticalityDiagnostics.List = append(iesCriticalityDiagnostics.List,
+			buildCriticalityDiagnosticsIEItem(ie.CriticalityPresentReject,
+				ie.ProtocolIEIDPDUSessionResourceSetupListSUReq, ie.TypeOfErrorPresentMissing))
 	}
 
 	if len(iesCriticalityDiagnostics.List) > 0 {
@@ -2654,6 +2673,8 @@ func HandleOverloadStop(amf *context.TNGFAMF, message *ngapMessage.OverloadStop)
 	// metricStatusOk = true
 }
 
+// buildCriticalityDiagnostics populates the optional fields exposed by the upgraded NGAP IE model.
+// Leaving these fields unset would make error responses carry an empty CriticalityDiagnostics IE.
 func buildCriticalityDiagnostics(
 	procedureCode *int64,
 	triggeringMessage *aper.Enumerated,
