@@ -383,13 +383,31 @@ func (ue *TNGFUe) CompleteChildSA(msgID uint32, outboundSPI uint32,
 	}
 
 	// Record to UE context with inbound SPI as key
-	ue.ChildSAMu.Lock()
-	ue.TNGFChildSecurityAssociation[childSA.InboundSPI] = childSA
-	ue.ChildSAMu.Unlock()
+	ue.StoreChildSA(childSA.InboundSPI, childSA)
 	// Record to TNGF context with inbound SPI as key
 	tngfContext.ChildSA.Store(childSA.InboundSPI, childSA)
 
 	return childSA, nil
+}
+
+func (ue *TNGFUe) StoreChildSA(inboundSPI uint32, childSA *ChildSecurityAssociation) {
+	ue.ChildSAMu.Lock()
+	defer ue.ChildSAMu.Unlock()
+	ue.TNGFChildSecurityAssociation[inboundSPI] = childSA
+}
+
+func (ue *TNGFUe) DeleteChildSA(inboundSPI uint32) {
+	ue.ChildSAMu.Lock()
+	defer ue.ChildSAMu.Unlock()
+	delete(ue.TNGFChildSecurityAssociation, inboundSPI)
+}
+
+func (ue *TNGFUe) RangeChildSA(fn func(uint32, *ChildSecurityAssociation)) {
+	ue.ChildSAMu.RLock()
+	defer ue.ChildSAMu.RUnlock()
+	for spi, childSA := range ue.TNGFChildSecurityAssociation {
+		fn(spi, childSA)
+	}
 }
 
 func (ue *TNGFUe) AttachAMF(sctpAddr string) bool {

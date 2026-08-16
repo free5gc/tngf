@@ -1502,9 +1502,7 @@ func handleInformationalDeletePayload(
 			spi := binary.BigEndian.Uint32(deletePayload.SPIs[offset : offset+4])
 			tngfSelf.ChildSA.Delete(spi)
 			if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil {
-				ue.ChildSAMu.Lock()
-				delete(ue.TNGFChildSecurityAssociation, spi)
-				ue.ChildSAMu.Unlock()
+				ue.DeleteChildSA(spi)
 			}
 		}
 	case ike_message.TypeIKE:
