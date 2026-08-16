@@ -28,6 +28,12 @@ var cachedResponses sync.Map
 
 func init() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ikeLog.Errorf("panic in cached response cleanup goroutine: %v", r)
+			}
+		}()
+
 		ticker := time.NewTicker(cachedResponseCleanupInterval)
 		defer ticker.Stop()
 
@@ -81,7 +87,11 @@ func sendIKEPacketToUE(udpConn *net.UDPConn, dstAddr *net.UDPAddr, pkt []byte) {
 
 func cleanupExpiredCachedResponses(now time.Time) {
 	cachedResponses.Range(func(key, value interface{}) bool {
-		response := value.(cachedResponse)
+		response, ok := value.(cachedResponse)
+		if !ok {
+			cachedResponses.Delete(key)
+			return true
+		}
 		if now.After(response.expiresAt) {
 			cachedResponses.Delete(key)
 		}
@@ -92,8 +102,12 @@ func cleanupExpiredCachedResponses(now time.Time) {
 func ForgetCachedIKEResponsesBefore(responderSPI uint64, messageID uint32) {
 	now := time.Now()
 	cachedResponses.Range(func(key, value interface{}) bool {
-		responseKey := key.(cachedResponseKey)
-		response := value.(cachedResponse)
+		responseKey, keyOk := key.(cachedResponseKey)
+		response, valOk := value.(cachedResponse)
+		if !keyOk || !valOk {
+			cachedResponses.Delete(key)
+			return true
+		}
 		if now.After(response.expiresAt) ||
 			(responseKey.responderSPI == responderSPI && responseKey.messageID < messageID) {
 			cachedResponses.Delete(key)
@@ -140,7 +154,11 @@ func RetransmitCachedIKEMessageToUE(
 	if !ok {
 		return false
 	}
-	response := cachedResponseValue.(cachedResponse)
+	response, ok := cachedResponseValue.(cachedResponse)
+	if !ok {
+		cachedResponses.Delete(key)
+		return false
+	}
 	if time.Now().After(response.expiresAt) {
 		cachedResponses.Delete(key)
 		return false
