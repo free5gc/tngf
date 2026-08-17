@@ -290,6 +290,16 @@ func HandleIKESAINIT(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, messag
 
 	// Create new IKE security association
 	ikeSecurityAssociation := tngfSelf.NewIKESecurityAssociation()
+	if ikeSecurityAssociation == nil {
+		ikeLog.Warn("Failed to allocate new IKE SA")
+		responseIKEMessage.BuildIKEHeader(message.InitiatorSPI, message.ResponderSPI,
+			ike_message.IKE_SA_INIT, ike_message.ResponseBitCheck, message.MessageID)
+		responseIKEMessage.Payloads.Reset()
+		responseIKEMessage.Payloads.BuildNotification(ike_message.TypeNone, ike_message.TEMPORARY_FAILURE, nil, nil)
+
+		SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+		return
+	}
 	ikeSecurityAssociation.RemoteSPI = message.InitiatorSPI
 	ikeSecurityAssociation.InitiatorMessageID = message.MessageID
 	ikeSecurityAssociation.UEIsBehindNAT = ueIsBehindNAT
@@ -665,7 +675,6 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 	// Load needed information
 	thisUE := tngfSelf.UELoadbyIDi(initiatorID.IDData)
 	fmt.Println("initiatorID.IDData: ", string(initiatorID.IDData))
-	ikeSecurityAssociation.ThisUE = thisUE
 	if thisUE == nil {
 		ikeLog.Errorln("UE is nil")
 		return
@@ -912,6 +921,7 @@ func HandleIKEAUTH(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message 
 
 	// Store SA into tngfUE
 	thisUE.TNGFIKESecurityAssociation = ikeSecurityAssociation
+	ikeSecurityAssociation.ThisUE.Store(thisUE)
 
 	// Store IKE Connection
 	UDPSocket := context.UDPSocketInfo{
@@ -1125,7 +1135,7 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 	ikeSecurityAssociation.ResponderMessageID = message.MessageID
 
 	// UE context
-	thisUE := ikeSecurityAssociation.ThisUE
+	thisUE := ikeSecurityAssociation.ThisUE.Load()
 	if thisUE == nil {
 		ikeLog.Error("UE context is nil")
 		return
@@ -1397,6 +1407,98 @@ func HandleCREATECHILDSA(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, me
 					temporaryPDUSessionSetupData.FailedListSURes, nil)
 			}
 			break
+		}
+	}
+}
+
+func HandleInformational(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAddr, message *ike_message.IKEMessage) {
+	ikeLog.Info("Handle INFORMATIONAL")
+
+	if message == nil {
+		ikeLog.Error("IKE Message is nil")
+		return
+	}
+
+	tngfSelf := context.TNGFSelf()
+	localSPI := message.ResponderSPI
+
+	ikeSecurityAssociation, ok := tngfSelf.IKESALoad(localSPI)
+	if !ok {
+		ikeLog.Warnf("Received INFORMATIONAL for unrecognized SPI: responder=0x%x", message.ResponderSPI)
+		return
+	}
+
+	for _, payload := range message.Payloads {
+		if encryptedPayload, isEncrypted := payload.(*ike_message.Encrypted); isEncrypted {
+			decryptedPayloads, err := DecryptProcedure(ikeSecurityAssociation, message, encryptedPayload)
+			if err != nil {
+				ikeLog.Errorf("Decrypt INFORMATIONAL message failed: %+v", err)
+				return
+			}
+			for _, decryptedPayload := range decryptedPayloads {
+				deletePayload, isDelete := decryptedPayload.(*ike_message.Delete)
+				if !isDelete {
+					continue
+				}
+				handleInformationalDeletePayload(tngfSelf, ikeSecurityAssociation, deletePayload)
+			}
+			continue
+		}
+
+		deletePayload, isDelete := payload.(*ike_message.Delete)
+		if !isDelete {
+			continue
+		}
+		handleInformationalDeletePayload(tngfSelf, ikeSecurityAssociation, deletePayload)
+	}
+
+	// RFC 7296 §2.21: every INFORMATIONAL request must receive an empty INFORMATIONAL response
+	responseIKEMessage := new(ike_message.IKEMessage)
+	var responseIKEPayload ike_message.IKEPayloadContainer
+	responseIKEMessage.BuildIKEHeader(
+		ikeSecurityAssociation.RemoteSPI,
+		ikeSecurityAssociation.LocalSPI,
+		ike_message.INFORMATIONAL,
+		ike_message.ResponseBitCheck,
+		message.MessageID,
+	)
+	if err := EncryptProcedure(ikeSecurityAssociation, responseIKEPayload, responseIKEMessage); err != nil {
+		ikeLog.Errorf("Encrypting INFORMATIONAL response failed: %+v", err)
+		return
+	}
+	SendIKEMessageToUE(udpConn, tngfAddr, ueAddr, responseIKEMessage)
+}
+
+func handleInformationalDeletePayload(
+	tngfSelf *context.TNGFContext,
+	ikeSecurityAssociation *context.IKESecurityAssociation,
+	deletePayload *ike_message.Delete,
+) {
+	switch deletePayload.ProtocolID {
+	case ike_message.TypeESP:
+		if deletePayload.SPISize != 4 {
+			return
+		}
+
+		for i := uint16(0); i < deletePayload.NumberOfSPI; i++ {
+			offset := int(i) * 4
+			if offset+4 > len(deletePayload.SPIs) {
+				break
+			}
+
+			spi := binary.BigEndian.Uint32(deletePayload.SPIs[offset : offset+4])
+			tngfSelf.ChildSA.Delete(spi)
+			if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil {
+				ue.ChildSAMu.Lock()
+				delete(ue.TNGFChildSecurityAssociation, spi)
+				ue.ChildSAMu.Unlock()
+			}
+		}
+	case ike_message.TypeIKE:
+		if ue := ikeSecurityAssociation.ThisUE.Load(); ue != nil && ue.TNGFIKESecurityAssociation != nil {
+			ue.Remove()
+		} else {
+			tngfSelf.DeleteIKESecurityAssociation(ikeSecurityAssociation.LocalSPI)
 		}
 	}
 }

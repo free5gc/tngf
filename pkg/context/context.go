@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
@@ -25,6 +27,11 @@ var tngfContext = TNGFContext{}
 
 const RadiusDefaultSecret = "free5GC"
 
+var (
+	maxIKESecurityAssociations         = 4096
+	unauthenticatedIKESAExpireDuration = 5 * time.Minute
+)
+
 type TNGFContext struct {
 	NFInfo           TNGFNFInfo
 	AMFSCTPAddresses []*sctp.SCTPAddr
@@ -38,6 +45,7 @@ type TNGFContext struct {
 	AMFPool                sync.Map // map[string]*TNGFAMF, SCTPAddr as key
 	AMFReInitAvailableList sync.Map // map[string]bool, SCTPAddr as key
 	IKESA                  sync.Map // map[uint64]*IKESecurityAssociation, SPI as key
+	ikeSACount             atomic.Int64
 	ChildSA                sync.Map // map[uint32]*ChildSecurityAssociation, inboundSPI as key
 	GTPConnectionWithUPF   sync.Map // map[string]*gtpv1.UPlaneConn, UPF address as key
 	AllocatedUEIPAddress   sync.Map // map[string]*TNGFUe, IPAddr as key
@@ -177,7 +185,16 @@ func (context *TNGFContext) AMFReInitAvailableListStore(sctpAddr string, flag bo
 }
 
 func (context *TNGFContext) NewIKESecurityAssociation() *IKESecurityAssociation {
-	ikeSecurityAssociation := new(IKESecurityAssociation)
+	now := time.Now()
+	context.cleanupExpiredUnauthenticatedIKESA(now)
+
+	if context.ikeSACount.Add(1) > int64(maxIKESecurityAssociations) {
+		context.ikeSACount.Add(-1)
+		contextLog.Warn("[Context] IKE SA pool is full; reject new IKE SA")
+		return nil
+	}
+
+	ikeSecurityAssociation := &IKESecurityAssociation{CreatedAt: now}
 
 	maxSPI := new(big.Int).SetUint64(math.MaxUint64)
 	var localSPIuint64 uint64
@@ -185,6 +202,7 @@ func (context *TNGFContext) NewIKESecurityAssociation() *IKESecurityAssociation 
 	for {
 		localSPI, err := rand.Int(rand.Reader, maxSPI)
 		if err != nil {
+			context.ikeSACount.Add(-1)
 			contextLog.Error("[Context] Error occurs when generate new IKE SPI")
 			return nil
 		}
@@ -199,8 +217,35 @@ func (context *TNGFContext) NewIKESecurityAssociation() *IKESecurityAssociation 
 	return ikeSecurityAssociation
 }
 
+func (context *TNGFContext) cleanupExpiredUnauthenticatedIKESA(now time.Time) {
+	context.IKESA.Range(func(key, value interface{}) bool {
+		ikeSecurityAssociation, ok := value.(*IKESecurityAssociation)
+		if !ok {
+			if _, deleted := context.IKESA.LoadAndDelete(key); deleted {
+				context.ikeSACount.Add(-1)
+			}
+			return true
+		}
+
+		if ikeSecurityAssociation.ThisUE.Load() != nil {
+			return true
+		}
+
+		if ikeSecurityAssociation.CreatedAt.IsZero() ||
+			now.Sub(ikeSecurityAssociation.CreatedAt) > unauthenticatedIKESAExpireDuration {
+			if _, deleted := context.IKESA.LoadAndDelete(key); deleted {
+				context.ikeSACount.Add(-1)
+			}
+		}
+
+		return true
+	})
+}
+
 func (context *TNGFContext) DeleteIKESecurityAssociation(spi uint64) {
-	context.IKESA.Delete(spi)
+	if _, loaded := context.IKESA.LoadAndDelete(spi); loaded {
+		context.ikeSACount.Add(-1)
+	}
 }
 
 func (context *TNGFContext) UELoadbyIDi(idi []byte) *TNGFUe {
