@@ -4,10 +4,10 @@ go 1.26.2
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/free5gc/nas v1.2.4-0.20260707083822-348faf940c55
-	github.com/free5gc/ngap v1.1.4-0.20260707055048-c26215fe47ef
-	github.com/free5gc/sctp v1.1.3-0.20260707033444-1d50775f182e
-	github.com/free5gc/util v1.3.3-0.20260806004242-cfe683dea97d
+	github.com/free5gc/nas v1.3.0
+	github.com/free5gc/ngap v1.2.0
+	github.com/free5gc/sctp v1.2.0
+	github.com/free5gc/util v1.4.0
 	github.com/prometheus/client_golang v1.21.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.7
