@@ -145,6 +145,15 @@ func BuildInitialContextSetupResponse(
 	failedList *ie.PDUSessionResourceFailedToSetupListCxtRes,
 	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
+	// A non-nil pointer to an empty list must not be encoded as "present" -
+	// callers (e.g. the NGAP handler) always allocate these lists up front,
+	// even when nothing is ever appended to them.
+	if responseList != nil && len(responseList.List) == 0 {
+		responseList = nil
+	}
+	if failedList != nil && len(failedList.List) == 0 {
+		failedList = nil
+	}
 	return (&ngapMessage.InitialContextSetupResponse{
 		AMFUENGAPID:                       &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
 		RANUENGAPID:                       &ie.RANUENGAPID{Value: ue.RanUeNgapId},
@@ -615,6 +624,15 @@ func BuildPDUSessionResourceSetupResponse(
 	failedList *ie.PDUSessionResourceFailedToSetupListSURes,
 	criticalityDiagnostics *ie.CriticalityDiagnostics,
 ) ([]byte, error) {
+	// A non-nil pointer to an empty list must not be encoded as "present" -
+	// callers (e.g. the NGAP handler) always allocate these lists up front,
+	// even when nothing is ever appended to them.
+	if responseList != nil && len(responseList.List) == 0 {
+		responseList = nil
+	}
+	if failedList != nil && len(failedList.List) == 0 {
+		failedList = nil
+	}
 	return (&ngapMessage.PDUSessionResourceSetupResponse{
 		AMFUENGAPID:                              &ie.AMFUENGAPID{Value: ue.AmfUeNgapId},
 		RANUENGAPID:                              &ie.RANUENGAPID{Value: ue.RanUeNgapId},
