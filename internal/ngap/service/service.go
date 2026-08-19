@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	lib_ngap "github.com/free5gc/ngap"
+	ngap_message "github.com/free5gc/ngap/message"
 	"github.com/free5gc/sctp"
 	"github.com/free5gc/tngf/internal/logger"
 	"github.com/free5gc/tngf/internal/ngap"
@@ -83,7 +83,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		errChan <- errors.New("get socket information failed")
 		return
 	}
-	info.PPID = lib_ngap.PPID
+	info.PPID = ngap_message.PPID
 	err = conn.SetDefaultSentParam(info)
 	if err != nil {
 		ngapLog.Errorf("[SCTP] SetDefaultSentParam(): %+v", err)
@@ -131,7 +131,7 @@ func listenAndServe(localAddr, remoteAddr *sctp.SCTPAddr, errChan chan<- error) 
 		} else {
 			ngapLog.Tracef("[SCTP] Successfully read %d bytes.", n)
 
-			if sctp_info == nil || sctp_info.PPID != lib_ngap.PPID {
+			if sctp_info == nil || sctp_info.PPID != ngap_message.PPID {
 				ngapLog.Warn("Received SCTP PPID != 60")
 				continue
 			}

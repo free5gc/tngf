@@ -11,8 +11,8 @@ import (
 	"github.com/vishvananda/netlink"
 	gtpv1 "github.com/wmnsk/go-gtp/gtpv1"
 
-	"github.com/free5gc/nas/nasType"
-	"github.com/free5gc/ngap/ngapType"
+	nasie "github.com/free5gc/nas/ie"
+	"github.com/free5gc/ngap/ie"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 )
 
@@ -40,7 +40,7 @@ type TNGFUe struct {
 	IPAddrv6         string
 	PortNumber       int32
 	TNAPID           uint64
-	MaskedIMEISV     *ngapType.MaskedIMEISV // TS 38.413 9.3.1.54
+	MaskedIMEISV     *ie.MaskedIMEISV // TS 38.413 9.3.1.54
 	Guti             string
 	IPSecInnerIP     net.IP
 	IPSecInnerIPAddr *net.IPAddr // Used to send UP packets to UE
@@ -62,10 +62,10 @@ type TNGFUe struct {
 	TemporaryCachedNASMessage []byte
 
 	/* Security */
-	Ktngf                []uint8                          // 32 bytes (256 bits), value is from NGAP IE "Security Key"
-	Ktnap                []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
-	Ktipsec              []uint8                          // 32 bytes (256 bits), value is computed from Ktngf
-	SecurityCapabilities *ngapType.UESecurityCapabilities // TS 38.413 9.3.1.86
+	Ktngf                []uint8                    // 32 bytes (256 bits), value is from NGAP IE "Security Key"
+	Ktnap                []uint8                    // 32 bytes (256 bits), value is computed from Ktngf
+	Ktipsec              []uint8                    // 32 bytes (256 bits), value is computed from Ktngf
+	SecurityCapabilities *ie.UESecurityCapabilities // TS 38.413 9.3.1.86
 
 	/* IKE Security Association */
 	TNGFIKESecurityAssociation   *IKESecurityAssociation
@@ -89,28 +89,30 @@ type TNGFUe struct {
 	RadiusConnection *UDPSocketInfo
 
 	/* Others */
-	Guami                            *ngapType.GUAMI
-	IndexToRfsp                      int64
-	Ambr                             *ngapType.UEAggregateMaximumBitRate
-	AllowedNssai                     *ngapType.AllowedNSSAI
-	RadioCapability                  *ngapType.UERadioCapability                // TODO: This is for RRC, can be deleted
-	CoreNetworkAssistanceInformation *ngapType.CoreNetworkAssistanceInformation // TS 38.413 9.3.1.15
+	Guami        *ie.GUAMI
+	IndexToRfsp  int64
+	Ambr         *ie.UEAggregateMaximumBitRate
+	AllowedNssai *ie.AllowedNSSAI
+	// TODO: This is for RRC, can be deleted.
+	RadioCapability                  *ie.UERadioCapability
+	CoreNetworkAssistanceInformation *ie.CoreNetworkAssistanceInformationForInactive // TS 38.413 9.3.1.15
 	IMSVoiceSupported                int32
 	RRCEstablishmentCause            int16
 	UserName                         string
-	UEIdentity                       *nasType.MobileIdentity5GS
+	UEIdentity                       *nasie.MobileId5GS
+	UEIdentityRaw                    []byte
 }
 
 type PDUSession struct {
 	Id                               int64 // PDU Session ID
-	Type                             *ngapType.PDUSessionType
-	Ambr                             *ngapType.PDUSessionAggregateMaximumBitRate
-	Snssai                           ngapType.SNSSAI
-	NetworkInstance                  *ngapType.NetworkInstance
+	Type                             *ie.PDUSessionType
+	Ambr                             *ie.PDUSessionAggregateMaximumBitRate
+	Snssai                           ie.SNSSAI
+	NetworkInstance                  *ie.NetworkInstance
 	SecurityCipher                   bool
 	SecurityIntegrity                bool
-	MaximumIntegrityDataRateUplink   *ngapType.MaximumIntegrityProtectedDataRate
-	MaximumIntegrityDataRateDownlink *ngapType.MaximumIntegrityProtectedDataRate
+	MaximumIntegrityDataRateUplink   *ie.MaximumIntegrityProtectedDataRate
+	MaximumIntegrityDataRateDownlink *ie.MaximumIntegrityProtectedDataRate
 	GTPConnection                    *GTPConnectionInfo
 	QFIList                          []uint8
 	QosFlows                         map[int64]*QosFlow // QosFlowIdentifier as key
@@ -121,17 +123,17 @@ type PDUSessionSetupTemporaryData struct {
 	UnactivatedPDUSession []int64 // PDUSessionID as content
 	// NGAPProcedureCode is used to identify which type of
 	// response shall be used
-	NGAPProcedureCode ngapType.ProcedureCode
+	NGAPProcedureCode ie.ProcedureCode
 	// PDU session setup list response
-	SetupListCxtRes  *ngapType.PDUSessionResourceSetupListCxtRes
-	FailedListCxtRes *ngapType.PDUSessionResourceFailedToSetupListCxtRes
-	SetupListSURes   *ngapType.PDUSessionResourceSetupListSURes
-	FailedListSURes  *ngapType.PDUSessionResourceFailedToSetupListSURes
+	SetupListCxtRes  *ie.PDUSessionResourceSetupListCxtRes
+	FailedListCxtRes *ie.PDUSessionResourceFailedToSetupListCxtRes
+	SetupListSURes   *ie.PDUSessionResourceSetupListSURes
+	FailedListSURes  *ie.PDUSessionResourceFailedToSetupListSURes
 }
 
 type QosFlow struct {
 	Identifier int64
-	Parameters ngapType.QosFlowLevelQosParameters
+	Parameters ie.QosFlowLevelQosParameters
 }
 
 type GTPConnectionInfo struct {
@@ -272,7 +274,7 @@ func (ue *TNGFUe) FindPDUSession(pduSessionID int64) *PDUSession {
 	}
 }
 
-func (ue *TNGFUe) CreatePDUSession(pduSessionID int64, snssai ngapType.SNSSAI) (*PDUSession, error) {
+func (ue *TNGFUe) CreatePDUSession(pduSessionID int64, snssai ie.SNSSAI) (*PDUSession, error) {
 	if _, exists := ue.PduSessionList[pduSessionID]; exists {
 		return nil, fmt.Errorf("PDU Session[ID:%d] is already exists", pduSessionID)
 	}

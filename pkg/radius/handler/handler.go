@@ -315,6 +315,7 @@ func HandleRadiusAccessRequest(udpConn *net.UDPConn, tngfAddr, ueAddr *net.UDPAd
 			ue.RadiusSession = session
 			ue.AMF = selectedAMF
 			ue.UEIdentity = anParameters.UEIdentity
+			ue.UEIdentityRaw = anParameters.UEIdentityRaw
 
 			ue.RadiusConnection = &context.UDPSocketInfo{
 				Conn:     udpConn,
