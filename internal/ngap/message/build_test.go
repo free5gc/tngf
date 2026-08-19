@@ -76,9 +76,10 @@ func TestBuildMessageGoldenOutput(t *testing.T) {
 			expectedHex: "000f404f00000800550002007b00260007067e004101020300790013c000f4400e00060304050607080" +
 				"f80c0000201005a400118001a00070080c0010203040003400202000070400100000000050201112233",
 			build: func() ([]byte, error) {
-				ueWithGUTI := *ue
-				ueWithGUTI.Guti = "2089301020301020304"
-				return ngap_message.BuildInitialUEMessage(&ueWithGUTI, nasPdu, allowedNSSAI)
+				originalGuti := ue.Guti
+				ue.Guti = "2089301020301020304"
+				defer func() { ue.Guti = originalGuti }()
+				return ngap_message.BuildInitialUEMessage(ue, nasPdu, allowedNSSAI)
 			},
 		},
 		{
