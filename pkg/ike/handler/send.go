@@ -2,25 +2,77 @@ package handler
 
 import (
 	"net"
+	"sync"
+	"time"
 
+	"github.com/free5gc/tngf/pkg/context"
 	ike_message "github.com/free5gc/tngf/pkg/ike/message"
 )
 
-func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, message *ike_message.IKEMessage) {
-	ikeLog.Trace("Send IKE message to UE")
-	ikeLog.Trace("Encoding...")
-	pkt, err := message.Encode()
-	if err != nil {
-		ikeLog.Errorln(err)
+type cachedResponseKey struct {
+	responderSPI uint64
+	messageID    uint32
+}
+
+type cachedResponse struct {
+	packet    []byte
+	expiresAt time.Time
+}
+
+const (
+	cachedResponseLifetime        = 5 * time.Minute
+	cachedResponseCleanupInterval = time.Minute
+)
+
+var cachedResponses sync.Map
+
+func init() {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ikeLog.Errorf("panic in cached response cleanup goroutine: %v", r)
+			}
+		}()
+
+		ticker := time.NewTicker(cachedResponseCleanupInterval)
+		defer ticker.Stop()
+
+		for now := range ticker.C {
+			cleanupExpiredCachedResponses(now)
+		}
+	}()
+}
+
+func cacheIKEMessageResponse(message *ike_message.IKEMessage, packet []byte) {
+	if message == nil || message.ExchangeType == ike_message.IKE_SA_INIT ||
+		(message.Flags&ike_message.ResponseBitCheck) == 0 {
 		return
 	}
-	// As specified in RFC 7296 section 3.1, the IKE message send from/to UDP port 4500
-	// should prepend a 4 bytes zero
-	if srcAddr.Port == 4500 {
-		prependZero := make([]byte, 4)
-		pkt = append(prependZero, pkt...)
+	if _, ok := context.TNGFSelf().IKESALoad(message.ResponderSPI); !ok {
+		return
 	}
 
+	key := cachedResponseKey{
+		responderSPI: message.ResponderSPI,
+		messageID:    message.MessageID,
+	}
+	cachedResponses.Store(key, cachedResponse{
+		packet:    append([]byte(nil), packet...),
+		expiresAt: time.Now().Add(cachedResponseLifetime),
+	})
+}
+
+func buildIKEPacketForUDP(srcAddr *net.UDPAddr, pkt []byte) []byte {
+	// As specified in RFC 7296 section 3.1, the IKE message send from/to UDP port 4500
+	// should prepend a 4 bytes zero
+	if srcAddr != nil && srcAddr.Port == 4500 {
+		prependZero := make([]byte, 4)
+		return append(prependZero, pkt...)
+	}
+	return pkt
+}
+
+func sendIKEPacketToUE(udpConn *net.UDPConn, dstAddr *net.UDPAddr, pkt []byte) {
 	ikeLog.Trace("Sending...")
 	n, err := udpConn.WriteToUDP(pkt, dstAddr)
 	if err != nil {
@@ -31,4 +83,102 @@ func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, mes
 		ikeLog.Errorf("Not all of the data is sent. Total length: %d. Sent: %d.", len(pkt), n)
 		return
 	}
+}
+
+func cleanupExpiredCachedResponses(now time.Time) {
+	cachedResponses.Range(func(key, value interface{}) bool {
+		response, ok := value.(cachedResponse)
+		if !ok {
+			cachedResponses.Delete(key)
+			return true
+		}
+		if now.After(response.expiresAt) {
+			cachedResponses.Delete(key)
+		}
+		return true
+	})
+}
+
+func ForgetCachedIKEResponsesBefore(responderSPI uint64, messageID uint32) {
+	now := time.Now()
+	cachedResponses.Range(func(key, value interface{}) bool {
+		responseKey, keyOk := key.(cachedResponseKey)
+		response, valOk := value.(cachedResponse)
+		if !keyOk || !valOk {
+			cachedResponses.Delete(key)
+			return true
+		}
+		if now.After(response.expiresAt) ||
+			(responseKey.responderSPI == responderSPI && responseKey.messageID < messageID) {
+			cachedResponses.Delete(key)
+		}
+		return true
+	})
+}
+
+func markPeerRequestMessageIDProcessed(message *ike_message.IKEMessage) {
+	if message == nil || message.ExchangeType == ike_message.IKE_SA_INIT ||
+		(message.Flags&ike_message.ResponseBitCheck) == 0 {
+		return
+	}
+
+	ikeSecurityAssociation, ok := context.TNGFSelf().IKESALoad(message.ResponderSPI)
+	if !ok {
+		return
+	}
+
+	ikeSecurityAssociation.MessageIDMu.Lock()
+	defer ikeSecurityAssociation.MessageIDMu.Unlock()
+
+	expectedMessageID := ikeSecurityAssociation.PeerRequestMessageID + 1
+	if message.MessageID != expectedMessageID {
+		return
+	}
+
+	ikeSecurityAssociation.PeerRequestMessageID = message.MessageID
+	ForgetCachedIKEResponsesBefore(message.ResponderSPI, message.MessageID)
+}
+
+func RetransmitCachedIKEMessageToUE(
+	udpConn *net.UDPConn,
+	_ *net.UDPAddr,
+	dstAddr *net.UDPAddr,
+	responderSPI uint64,
+	messageID uint32,
+) bool {
+	key := cachedResponseKey{
+		responderSPI: responderSPI,
+		messageID:    messageID,
+	}
+	cachedResponseValue, ok := cachedResponses.Load(key)
+	if !ok {
+		return false
+	}
+	response, ok := cachedResponseValue.(cachedResponse)
+	if !ok {
+		cachedResponses.Delete(key)
+		return false
+	}
+	if time.Now().After(response.expiresAt) {
+		cachedResponses.Delete(key)
+		return false
+	}
+
+	sendIKEPacketToUE(udpConn, dstAddr, append([]byte(nil), response.packet...))
+	return true
+}
+
+func SendIKEMessageToUE(udpConn *net.UDPConn, srcAddr, dstAddr *net.UDPAddr, message *ike_message.IKEMessage) {
+	ikeLog.Trace("Send IKE message to UE")
+	ikeLog.Trace("Encoding...")
+	pkt, err := message.Encode()
+	if err != nil {
+		ikeLog.Errorln(err)
+		return
+	}
+	pkt = buildIKEPacketForUDP(srcAddr, pkt)
+	cleanupExpiredCachedResponses(time.Now())
+	cacheIKEMessageResponse(message, pkt)
+	markPeerRequestMessageIDProcessed(message)
+	sendIKEPacketToUE(udpConn, dstAddr, pkt)
 }
