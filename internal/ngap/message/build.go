@@ -337,7 +337,10 @@ func BuildUEContextModificationFailure(*context.TNGFUe, ie.Cause, *ie.Criticalit
 	return nil, errBuilderNotImplemented
 }
 
-func BuildUEContextReleaseComplete(ue *context.TNGFUe, criticalityDiagnostics *ie.CriticalityDiagnostics) ([]byte, error) {
+func BuildUEContextReleaseComplete(
+	ue *context.TNGFUe,
+	criticalityDiagnostics *ie.CriticalityDiagnostics,
+) ([]byte, error) {
 	if ue == nil {
 		return nil, errors.New("UE context is nil")
 	}
