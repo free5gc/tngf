@@ -105,6 +105,7 @@ type TNGFUe struct {
 	UserName                         string
 	UEIdentity                       *nasie.MobileId5GS
 	UEIdentityRaw                    []byte
+	TransactionChannels              map[uint32]chan bool // It's for NGAP handler waiting an IKE response
 }
 
 type PDUSession struct {
@@ -260,6 +261,7 @@ func (ue *TNGFUe) init(ranUeNgapId int64) {
 	ue.TNGFChildSecurityAssociation = make(map[uint32]*ChildSecurityAssociation)
 	ue.TemporaryExchangeMsgIDChildSAMapping = make(map[uint32]*ChildSecurityAssociation)
 	ue.TemporaryExchangeMsgIDChildSAExpiresAt = make(map[uint32]time.Time)
+	ue.TransactionChannels = make(map[uint32]chan bool)
 }
 
 func (ue *TNGFUe) Remove() {
