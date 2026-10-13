@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/asaskevich/govalidator"
 
@@ -65,6 +66,7 @@ func (i *Info) validate() (bool, error) {
 }
 
 type Configuration struct {
+	IdleTimeout      *time.Duration             `yaml:"idleTimeout,omitempty" valid:"optional"`
 	TNGFInfo         context.TNGFNFInfo         `yaml:"TNGFInformation" valid:"required"`
 	AMFSCTPAddresses []context.AMFSCTPAddresses `yaml:"AMFSCTPAddresses" valid:"required"`
 
@@ -326,4 +328,15 @@ func (c *Config) GetMetricsNamespace() string {
 		return c.Configuration.Metrics.Namespace
 	}
 	return TngfMetricsDefaultNamespace
+}
+
+// GetIdleTimeout returns the HTTP server idle timeout. Omitted values preserve
+// the previous 1ms timeout; an explicit zero disables the timeout.
+func (c *Config) GetIdleTimeout() time.Duration {
+	c.RLock()
+	defer c.RUnlock()
+	if c.Configuration == nil || c.Configuration.IdleTimeout == nil {
+		return time.Millisecond
+	}
+	return *c.Configuration.IdleTimeout
 }
