@@ -7,14 +7,14 @@ require (
 	github.com/free5gc/nas v1.3.0
 	github.com/free5gc/ngap v1.2.0
 	github.com/free5gc/sctp v1.2.0
-	github.com/free5gc/util v1.4.0
+	github.com/free5gc/util v1.4.1-0.20261014070359-d865b0ce854b
 	github.com/prometheus/client_golang v1.21.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/vishvananda/netlink v1.1.0
 	github.com/wmnsk/go-gtp v0.8.0
-	golang.org/x/net v0.47.0
-	golang.org/x/sys v0.38.0
+	golang.org/x/net v0.55.0
+	golang.org/x/sys v0.45.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -56,8 +56,8 @@ require (
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

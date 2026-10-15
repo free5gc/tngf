@@ -61,7 +61,8 @@ func NewApp(ctx context.Context, cfg *factory.Config, tlsKeyLogPath string) (*Tn
 	customMetrics := make(map[utils.MetricTypeEnabled][]prometheus.Collector)
 	if cfg.AreMetricsEnabled() {
 		if tngf.metricsServer, err = metrics.NewServer(
-			getInitMetrics(cfg, features, customMetrics), tlsKeyLogPath, logger.InitLog); err != nil {
+			getInitMetrics(cfg, features, customMetrics), tlsKeyLogPath, logger.InitLog, cfg.GetIdleTimeout(),
+		); err != nil {
 			return nil, err
 		}
 	}
